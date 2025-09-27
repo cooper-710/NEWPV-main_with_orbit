@@ -11,7 +11,6 @@ export function initScene() {
 
   renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
   renderer.setSize(window.innerWidth, window.innerHeight);
-    controls && controls.update();
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -23,17 +22,34 @@ export function initScene() {
   scene.background = new THREE.Color(0x141517);
   scene.fog = new THREE.Fog(0x141517, 85, 170);
 
-  // IBL
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(new RoomEnvironment(renderer), 0.12).texture;
 
-  // Camera
   camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
   camera.position.set(0, 2.6, -65);
   camera.lookAt(0, 2.5, 0);
   scene.add(camera);
 
-  // Lighting
+  controls = new OrbitControls(camera, renderer.domElement || canvas);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.enableRotate = true;
+  controls.enablePan = true;
+  controls.enableZoom = true;
+  controls.minDistance = 5;
+  controls.maxDistance = 180;
+  controls.mouseButtons = {
+    LEFT:   THREE.MOUSE.ROTATE,
+    MIDDLE: THREE.MOUSE.DOLLY,
+    RIGHT:  THREE.MOUSE.PAN
+  };
+  controls.touches = {
+    ONE: THREE.TOUCH.ROTATE,
+    TWO: THREE.TOUCH.DOLLY_PAN
+  };
+  controls.target.set(0, 2.5, -30);
+  controls.update();
+
   const key = new THREE.DirectionalLight(0xffe3c6, 1.8);
   key.position.set(6, 12, 8);
   key.castShadow = true;
@@ -48,7 +64,6 @@ export function initScene() {
   plateLight.position.set(0, 3.0, -60.5);
   scene.add(plateLight);
 
-  // Ground — solid, darker turf
   const ground = new THREE.Mesh(
     new THREE.PlaneGeometry(240, 240, 1, 1),
     createTurfMaterial()
@@ -57,7 +72,6 @@ export function initScene() {
   ground.receiveShadow = true;
   scene.add(ground);
 
-  // Mound (kept as-is; adjust if you want even more saturation)
   const mound = new THREE.Mesh(
     new THREE.CylinderGeometry(2.0, 9, 2.0, 64),
     new THREE.MeshStandardMaterial({ color: 0x3B2415, roughness: 0.95, metalness: 0.0 })
@@ -66,7 +80,6 @@ export function initScene() {
   mound.receiveShadow = true;
   scene.add(mound);
 
-  // Rubber
   const rubber = new THREE.Mesh(
     new THREE.BoxGeometry(1, 0.05, 0.18),
     new THREE.MeshPhysicalMaterial({ color: 0xf0f0f0, roughness: 0.55, clearcoat: 0.12 })
@@ -75,7 +88,6 @@ export function initScene() {
   rubber.castShadow = true; rubber.receiveShadow = true;
   scene.add(rubber);
 
-  // Strike zone
   const zone = new THREE.LineSegments(
     new THREE.EdgesGeometry(new THREE.PlaneGeometry(1.42, 2.0)),
     new THREE.LineBasicMaterial({ color: 0xf2f2f2, transparent:true, opacity:0.9 })
@@ -83,11 +95,11 @@ export function initScene() {
   zone.position.set(0, 2.35, -60.5);
   scene.add(zone);
 
-  // Plate
   const shape = new THREE.Shape();
   shape.moveTo(-0.85,0); shape.lineTo(0.85,0); shape.lineTo(0.85,0.5);
   shape.lineTo(0,1.0);   shape.lineTo(-0.85,0.5); shape.lineTo(-0.85,0);
-  const plate = new THREE.Mesh(new THREE.ShapeGeometry(shape),
+  const plate = new THREE.Mesh(
+    new THREE.ShapeGeometry(shape),
     new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.6, clearcoat: 0.2 })
   );
   plate.rotation.x = -Math.PI / 2;
@@ -99,10 +111,10 @@ export function initScene() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
-    controls && controls.update();
+    if (controls && typeof controls.update === 'function') controls.update();
   });
 
-  return { scene, camera, renderer, clock };
+  return { scene, camera, renderer, controls, clock };
 }
 
 export function setCameraView(view) {
