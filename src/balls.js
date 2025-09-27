@@ -56,61 +56,49 @@ export function addBall(pitch, pitchType) {
     type: pitchType,
     t0,
     mphDisplay,
-    release:  { x: -pitch.release_pos_x, y: pitch.release_pos_z, z: -pitch.release_extension },
-    velocity: { x: -pitch.vx0, y: pitch.vz0, z: pitch.vy0 },
-    accel:    { x: -pitch.ax,  y: pitch.az,  z: pitch.ay  },
-    spinRate: pitch.release_spin_rate || 0,
-    spinAxis: getSpinAxisVector(pitch.spin_axis || 0),
+    spinRate: pitch.spin || pitch.rpm || pitch.release_spin_rate || 0,
+    spinAxis: getSpinAxisVector(pitch) || new THREE.Vector3(0, 0, 1),
+    vx0: pitch.vx0 || 0,
+    vy0: pitch.vy0 || 0,
+    vz0: pitch.vz0 || 0,
+    ax: pitch.ax || 0,
+    ay: pitch.ay || 0,
+    az: pitch.az || 0,
   };
 
-  ball.position.set(ball.userData.release.x, ball.userData.release.y, ball.userData.release.z);
-  balls.push(ball);
   scene.add(ball);
+  balls.push(ball);
 }
 
-export function removeBallByType(pitchType) {
+export function removeBallByType(type) {
   const { scene } = getRefs();
-  balls = balls.filter(ball => {
-    if (ball.userData.type === pitchType) {
-      scene.remove(ball);
-      trailDots = trailDots.filter(d => {
-        const keep = d.mesh.userData?.type !== pitchType;
-        if (!keep) scene.remove(d.mesh);
-        return keep;
-      });
+  balls = balls.filter(b => {
+    if (b.userData.type === type) {
+      scene.remove(b);
       return false;
     }
     return true;
   });
 }
 
-export function replayAll() {
-  const { clock } = getRefs();
-  const now = clock.getElapsedTime();
-
-  // wipe existing trail but keep toggle state
-  clearTrails();
-
-  for (const b of balls) {
-    b.userData.t0 = now;
-    b.position.set(b.userData.release.x, b.userData.release.y, b.userData.release.z);
-  }
-  // leave showTrail as-is; new dots start accumulating if toggle is on
+export function setTrailVisible(on) {
+  showTrail = !!on;
+  if (!showTrail) clearTrails();
 }
 
 export function animateBalls(delta) {
-  const { scene, renderer, camera, clock } = getRefs();
+  const { scene, camera, renderer, clock, controls } = getRefs();
   const now = clock.getElapsedTime();
 
   for (const ball of balls) {
-    const { t0, release, velocity, accel, spinRate, spinAxis } = ball.userData;
+    const { t0, vx0, vy0, vz0, ax, ay, az, spinRate, spinAxis } = ball.userData;
     const t = now - t0;
-    const z = release.z + velocity.z * t + 0.5 * accel.z * t * t;
-    if (z <= -60.5) continue;
 
-    ball.position.x = release.x + velocity.x * t + 0.5 * accel.x * t * t;
-    ball.position.y = release.y + velocity.y * t + 0.5 * accel.y * t * t;
-    ball.position.z = z;
+    ball.position.set(
+      vx0 * t + 0.5 * ax * t * t,
+      1.05 + vy0 * t + 0.5 * ay * t * t,
+      vz0 * t + 0.5 * az * t * t
+    );
 
     if (showTrail) {
       const baseType = (ball.userData.type || '').split(' ')[0];
@@ -149,7 +137,9 @@ export function animateBalls(delta) {
     });
   }
 
-  if (controls) controls.update();
+  // ✅ Safe OrbitControls update
+  if (controls && typeof controls.update === 'function') controls.update();
+
   renderer.render(scene, camera);
 }
 
