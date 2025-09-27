@@ -37,8 +37,8 @@
     /* Canvas must accept pointer events for OrbitControls */
     #three-canvas{
       position:fixed; inset:0; width:100vw; height:100vh; display:block;
-      pointer-events:auto;      /* enables mouse/touch input */
-      touch-action:none;        /* prevent browser gestures from hijacking */
+      pointer-events:auto;
+      touch-action:none;
       cursor:grab;
     }
     #three-canvas:active{ cursor:grabbing; }
@@ -125,6 +125,12 @@
       <option value="1b">1st Base POV</option>
       <option value="3b">3rd Base POV</option>
     </select>
+
+    <!-- NEW: Orbit Mode toggle -->
+    <div class="switch">
+      <input type="checkbox" id="orbitToggle" checked>
+      <label for="orbitToggle">Orbit Mode</label>
+    </div>
 
     <div class="switch">
       <input type="checkbox" id="trailToggle">
