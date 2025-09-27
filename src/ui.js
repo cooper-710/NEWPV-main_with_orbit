@@ -1,11 +1,10 @@
 import { clearBalls, clearTrails, addBall, removeBallByType, setTrailVisible, replayAll } from './balls.js';
-import { setCameraView } from './scene.js';
+import { setCameraView, getRefs } from './scene.js';
 import { Bus } from './data.js';
 
 let _state = { team: null, pitcher: null };
-let _lastDatum = null; // currently selected pitch datum (from JSON)
+let _lastDatum = null;
 
-// ---------- helpers ----------
 function fmt(v, d = 1) {
   if (v === null || v === undefined || Number.isNaN(Number(v))) return '--';
   const n = Number(v);
@@ -17,7 +16,6 @@ function pick(...keys) {
   }
   return undefined;
 }
-// candidates: "key" or ["key", multiplier]
 function getVal(obj, candidates) {
   if (!obj) return undefined;
   for (const c of candidates) {
@@ -67,53 +65,43 @@ function renderMetrics({ mph, spin, ivb, hb }) {
   e('m-hb').textContent   = fmt(hb, 1);
 }
 
-// --------- TrackMan IVB from datum (gravity removed) ----------
 function trackmanIVBInches(d) {
-  // Use explicit IVB if present (already inches, positive = ride)
   const explicit = getVal(d, ['inducedVerticalBreak', 'ivb', 'ivb_in', 'ivb_inches']);
   if (explicit !== undefined) return Number(explicit);
 
-  // Otherwise compute: IVB = gravity_drop - total_drop
-  // total_drop from your JSON is movement_vertical (ft) → inches
   const totalDropIn = (() => {
     const mvIn = getVal(d, [['movement_vertical', 12], ['movement_vertical_ft', 12], 'vertical_movement_in', 'total_vertical_break_in']);
     return mvIn === undefined ? undefined : Math.abs(mvIn);
   })();
 
-  const t = pick(d.time_to_plate, d.timeToPlate, d.tt); // seconds
+  const t = pick(d.time_to_plate, d.timeToPlate, d.tt);
   if (totalDropIn !== undefined && t !== undefined) {
-    const g = 32.174; // ft/s^2
+    const g = 32.174;
     const gravityDropIn = 0.5 * g * (Number(t) ** 2) * 12;
-    return gravityDropIn - totalDropIn; // + = ride, - = extra drop
+    return gravityDropIn - totalDropIn;
   }
 
-  // Last resort: spin-only vertical deflection from Statcast-style fields (already inches)
   const pfxZ = getVal(d, ['pfx_z', 'vz_break', 'vertBreak']);
   return pfxZ;
 }
 
-// derive metrics from a raw datum (your JSON object for a pitch)
 function metricsFromDatum(d) {
   if (!d) return { mph: undefined, spin: undefined, ivb: undefined, hb: undefined };
 
   const mph  = pick(d.mph, d.velocity, d.vel, d.release_speed);
   const spin = pick(d.spin, d.rpm, d.release_spin_rate);
-
   const ivb  = trackmanIVBInches(d);
 
-  // HB (no gravity on X). Prefer inch-native, else convert ft → in.
   const hbRaw = getVal(d, [
     'hb', 'hb_in', 'hb_inches', 'horizontalBreak', 'hbreak', 'horizontal_break',
     ['pfx_x', 1],
     ['movement_horizontal', 12], ['movement_horizontal_ft', 12]
   ]);
-  const hb = hbRaw === undefined ? undefined : -hbRaw;   // flip the sign
-
+  const hb = hbRaw === undefined ? undefined : -hbRaw;
 
   return { mph, spin, ivb, hb };
 }
 
-// ---------- UI builders ----------
 export function buildPitchCheckboxes(pitcherData) {
   const container = document.getElementById('pitchCheckboxes');
   container.innerHTML = '';
@@ -219,6 +207,7 @@ export function initControls(data, setPlaying) {
   const cameraSelect  = document.getElementById('cameraSelect');
   const replayBtn     = document.getElementById('replayBtn');
   const toggleBtn     = document.getElementById('toggleBtn');
+  const orbitToggle   = document.getElementById('orbitToggle');
   const trailToggle   = document.getElementById('trailToggle');
   const metricsPanel  = document.getElementById('metricsPanel');
 
@@ -255,25 +244,27 @@ export function initControls(data, setPlaying) {
 
   trailToggle.addEventListener('change', e => { setTrailVisible(e.target.checked); _writeUrl(); });
 
+  // NEW: Orbit toggle bind
+  orbitToggle.addEventListener('change', e => {
+    const { controls } = getRefs();
+    if (controls) controls.enabled = !!e.target.checked;
+    _writeUrl();
+  });
+
   buildMetricsPanel(metricsPanel);
 
-  // Live updates for mph/spin; IVB/HB come from selected datum
   let loggedKeysOnce = false;
   Bus.on('frameStats', (s) => {
     const last = s && s.last ? s.last : {};
-
     if (!loggedKeysOnce) {
       try { console.debug('[metrics] frameStats.last keys:', Object.keys(last).sort()); } catch (_) {}
       loggedKeysOnce = true;
     }
-
     const liveMph  = pick(last.mph, last.velocity, last.vel, last.release_speed);
     const liveSpin = pick(last.spin, last.rpm, last.release_spin_rate);
-
     const base = metricsFromDatum(_lastDatum);
     const mph  = liveMph  !== undefined ? liveMph  : base.mph;
     const spin = liveSpin !== undefined ? liveSpin : base.spin;
-
     renderMetrics({ mph, spin, ivb: base.ivb, hb: base.hb });
   });
 
@@ -282,6 +273,7 @@ export function initControls(data, setPlaying) {
   const wantPitcher = params.get('pitcher');
   const wantView = params.get('view');
   const wantTrail = params.get('trail');
+  const wantOrbit = params.get('orbit');
 
   if (wantTeam && data[wantTeam]) {
     teamSelect.value = wantTeam;
@@ -303,13 +295,24 @@ export function initControls(data, setPlaying) {
     trailToggle.checked = (wantTrail === '1' || wantTrail === 'true');
     trailToggle.dispatchEvent(new Event('change'));
   }
+  if (wantOrbit !== null) {
+    const on = (wantOrbit === '1' || wantOrbit === 'true');
+    orbitToggle.checked = on;
+    const { controls } = getRefs();
+    if (controls) controls.enabled = on;
+  } else {
+    orbitToggle.checked = true;
+    const { controls } = getRefs();
+    if (controls) controls.enabled = true;
+  }
 
   function _writeUrl() {
     const q = new URLSearchParams({
       team: _state.team || '',
       pitcher: _state.pitcher || '',
       view: cameraSelect.value || '',
-      trail: trailToggle.checked ? '1' : '0'
+      trail: trailToggle.checked ? '1' : '0',
+      orbit: orbitToggle.checked ? '1' : '0'
     });
     const newUrl = `${location.pathname}?${q.toString()}`;
     history.replaceState(null, '', newUrl);
