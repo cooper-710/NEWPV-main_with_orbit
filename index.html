@@ -33,7 +33,15 @@
       font:14px/1.45 -apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Helvetica,Arial,"Noto Sans","Segoe UI",sans-serif;
       letter-spacing:.2px; -webkit-font-smoothing:antialiased; overflow:hidden;
     }
-    #three-canvas{position:fixed; inset:0; width:100vw; height:100vh; display:block}
+
+    /* Canvas must accept pointer events for OrbitControls */
+    #three-canvas{
+      position:fixed; inset:0; width:100vw; height:100vh; display:block;
+      pointer-events:auto;      /* enables mouse/touch input */
+      touch-action:none;        /* prevent browser gestures from hijacking */
+      cursor:grab;
+    }
+    #three-canvas:active{ cursor:grabbing; }
 
     .panel{
       position:absolute; background:var(--glass); border:1px solid var(--stroke);
