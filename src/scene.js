@@ -33,11 +33,17 @@ export function initScene() {
   controls = new OrbitControls(camera, renderer.domElement || canvas);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
+  controls.zoomSpeed = 0.8;
+  controls.rotateSpeed = 0.9;
+  controls.panSpeed = 0.6;
+  controls.enablePan = false;
   controls.enableRotate = true;
+  controls.minPolarAngle = 0.05;
+  controls.maxPolarAngle = Math.PI / 2.05;
   controls.enablePan = true;
   controls.enableZoom = true;
-  controls.minDistance = 5;
-  controls.maxDistance = 180;
+  controls.minDistance = 6;
+  controls.maxDistance = 36;
   controls.mouseButtons = {
     LEFT:   THREE.MOUSE.ROTATE,
     MIDDLE: THREE.MOUSE.DOLLY,
