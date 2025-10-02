@@ -49,7 +49,7 @@
       -webkit-backdrop-filter:saturate(160%) blur(14px); box-shadow:var(--shadow);
     }
 
-    #controls{top:20px; left:20px; width:260px; max-width:min(92vw, 320px); padding:18px; max-height:calc(100vh - 40px); overflow-y:auto; overscroll-behavior:contain}
+    #controls{top:20px; left:20px; width:240px; max-width:min(88vw, 280px); padding:16px; max-height:calc(100vh - 40px); overflow-y:auto; overscroll-behavior:contain}
     #controls label{font-weight:600; margin:8px 0 6px; font-size:13px; color:var(--muted)}
     select,button{
       width:100%; border-radius:12px; padding:10px 12px; font-size:14px;
@@ -72,7 +72,7 @@
     .switch input:checked:after{left:20px}
 
     #pitchCheckboxes{display:block; margin-top:14px; max-height:clamp(160px, 38vh, 360px); overflow-y:auto; overscroll-behavior:contain}
-    .pitch-type-group{background:rgba(255,255,255,0.04); border:1px solid var(--stroke); border-radius:12px; padding:10px; margin-top:14px}
+    .pitch-type-group{background:rgba(255,255,255,0.04); margin-top:10px; padding:8px; border:1px solid var(--stroke); border-radius:12px; padding:10px; margin-top:14px}
     .pitch-type-title{font-size:14px; font-weight:700; margin:0 0 8px 0; display:flex; align-items:center; justify-content:space-between}
     .checkbox-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:6px}
     .checkbox-group{display:flex; align-items:center; justify-content:center; gap:6px}
@@ -100,8 +100,11 @@
     .metric-value{font-size:18px; font-weight:800; line-height:1.1; margin-top:2px}
     .metric-unit{font-size:11px; color:var(--muted); margin-top:2px}
 
+    @media (max-width: 1024px){
+      #controls{width:min(88vw, 260px); left:16px; right:auto; padding:14px}
+    }
     @media (max-width: 720px){
-      #controls{width:calc(100vw - 40px); left:20px; right:20px; max-height:calc(100vh - 40px)}
+      #controls{width:calc(100vw - 32px); left:16px; right:16px; padding:12px}
       #metricsPanel{display:none}
     }
   </style>
