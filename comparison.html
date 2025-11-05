@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SEQUENCE | Pitch Comparison</title>
+  <link rel="icon" href="data:,">
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.148.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.148.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+    
+    :root{
+      --bg: #000000;
+      --bg-alt: #0a0a0a;
+      --panel-bg: rgba(0, 0, 0, 0.85);
+      --panel-border: rgba(255, 255, 255, 0.15);
+      --panel-border-glow: rgba(255, 102, 0, 0.3);
+      --text: #ffffff;
+      --text-muted: rgba(255, 255, 255, 0.6);
+      --text-dim: rgba(255, 255, 255, 0.4);
+      --accent-orange: #ff6600;
+      --accent-orange-bright: #ff8800;
+      --accent-orange-glow: rgba(255, 102, 0, 0.5);
+      --accent-orange-glow-intense: rgba(255, 102, 0, 0.8);
+      --white: #ffffff;
+      --radius: 8px;
+      --radius-sm: 4px;
+      --shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
+      --shadow-glow: 0 0 24px rgba(255, 102, 0, 0.4);
+      --player1-color: #ff6600;
+      --player2-color: #00aaff;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      letter-spacing: 0.01em;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Geometric background pattern */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: 
+        radial-gradient(circle at 2px 2px, rgba(255, 255, 255, 0.03) 1px, transparent 0),
+        linear-gradient(90deg, transparent 0%, rgba(255, 102, 0, 0.02) 50%, transparent 100%),
+        linear-gradient(0deg, transparent 0%, rgba(255, 102, 0, 0.02) 50%, transparent 100%);
+      background-size: 40px 40px, 200px 200px, 200px 200px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Canvas */
+    #three-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      width: 100vw;
+      height: 100vh;
+      display: block;
+      pointer-events: auto;
+      touch-action: none;
+      z-index: 1;
+    }
+
+    /* Panel Base Styles */
+    .panel {
+      position: fixed;
+      background: var(--panel-bg);
+      border: 2px solid var(--panel-border);
+      border-radius: var(--radius);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      box-shadow: 
+        0 8px 32px rgba(0, 0, 0, 0.8),
+        0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+        0 0 60px rgba(255, 102, 0, 0.03);
+      z-index: 10;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .panel:hover {
+      border-color: rgba(255, 255, 255, 0.2);
+      box-shadow: 
+        0 12px 40px rgba(0, 0, 0, 0.9),
+        0 0 0 1px rgba(255, 255, 255, 0.08) inset,
+        0 0 80px rgba(255, 102, 0, 0.05);
+    }
+
+    /* Comparison Header */
+    .comparison-header {
+      position: fixed;
+      top: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 12px 20px;
+      background: var(--panel-bg);
+      border: 2px solid var(--panel-border);
+      border-radius: var(--radius);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      box-shadow: 
+        0 8px 32px rgba(0, 0, 0, 0.8),
+        0 0 0 1px rgba(255, 255, 255, 0.05) inset,
+        0 0 60px rgba(255, 102, 0, 0.03);
+      z-index: 10;
+    }
+
+    .comparison-header-left {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .sequence-logo {
+      width: 48px;
+      height: 48px;
+      opacity: 0.95;
+      transition: all 0.3s ease;
+      filter: drop-shadow(0 0 12px rgba(255, 102, 0, 0.4));
+    }
+
+    .sequence-logo:hover {
+      opacity: 1;
+      transform: scale(1.05);
+      filter: drop-shadow(0 0 16px rgba(255, 102, 0, 0.6));
+    }
+
+    .sequence-logo img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .comparison-header h2 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--accent-orange);
+    }
+
+    .comparison-header-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .comparison-header-right button {
+      padding: 6px 12px;
+      font-size: 11px;
+      border: 1px solid var(--panel-border);
+      line-height: 1.4;
+      height: auto;
+      min-height: 28px;
+      box-sizing: border-box;
+    }
+
+    .comparison-header-right button.primary {
+      border: 1px solid var(--accent-orange);
+    }
+
+    .comparison-header-right .custom-dropdown-trigger {
+      padding: 6px 32px 6px 12px;
+      font-size: 11px;
+      line-height: 1.4;
+      min-height: 28px;
+      box-sizing: border-box;
+      border: 1px solid var(--panel-border);
+    }
+
+    .header-select-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      position: relative;
+    }
+
+    .header-select-group label {
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      margin: 0;
+    }
+
+    .custom-dropdown {
+      position: relative;
+      min-width: 140px;
+    }
+
+    .custom-dropdown-trigger {
+      width: 100%;
+      padding: 8px 32px 8px 12px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 2px solid var(--panel-border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      outline: none;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: relative;
+    }
+
+    .custom-dropdown-trigger:hover {
+      border-color: rgba(255, 102, 0, 0.5);
+      background-color: rgba(255, 255, 255, 0.08);
+      box-shadow: 0 0 16px rgba(255, 102, 0, 0.2);
+      transform: translateY(-1px);
+    }
+
+    .custom-dropdown.open .custom-dropdown-trigger {
+      border-color: var(--accent-orange);
+      background-color: rgba(255, 255, 255, 0.1);
+      box-shadow: 0 0 20px var(--accent-orange-glow);
+    }
+
+    .custom-dropdown-arrow {
+      position: absolute;
+      right: 10px;
+      width: 12px;
+      height: 8px;
+      transition: transform 0.3s ease;
+      pointer-events: none;
+    }
+
+    .custom-dropdown.open .custom-dropdown-arrow {
+      transform: rotate(180deg);
+    }
+
+    .custom-dropdown-menu {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      background: rgba(0, 0, 0, 0.98);
+      border: 2px solid var(--panel-border);
+      border-radius: var(--radius-sm);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      box-shadow: 
+        0 8px 32px rgba(0, 0, 0, 0.9),
+        0 0 0 1px rgba(255, 255, 255, 0.1) inset,
+        0 0 60px rgba(255, 102, 0, 0.2);
+      z-index: 1000;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(-10px);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      max-height: 300px;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+
+    .custom-dropdown.open .custom-dropdown-menu {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
+    }
+
+    .custom-dropdown-item {
+      padding: 10px 12px;
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .custom-dropdown-item:last-child {
+      border-bottom: none;
+    }
+
+    .custom-dropdown-item:hover {
+      background: rgba(255, 102, 0, 0.15);
+      color: var(--accent-orange);
+      padding-left: 16px;
+    }
+
+    .custom-dropdown-item.selected {
+      background: rgba(255, 102, 0, 0.2);
+      color: var(--accent-orange);
+      font-weight: 600;
+    }
+
+    .custom-dropdown-menu::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .custom-dropdown-menu::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 3px;
+    }
+
+    .custom-dropdown-menu::-webkit-scrollbar-thumb {
+      background: rgba(255, 102, 0, 0.4);
+      border-radius: 3px;
+    }
+
+    .custom-dropdown-menu::-webkit-scrollbar-thumb:hover {
+      background: var(--accent-orange);
+    }
+
+    .back-button {
+      padding: 6px 12px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--panel-border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      line-height: 1.4;
+      height: auto;
+      min-height: 28px;
+      box-sizing: border-box;
+    }
+
+    .back-button:hover {
+      background: rgba(255, 102, 0, 0.2);
+      border-color: var(--accent-orange);
+    }
+
+    /* Controls Panel */
+    #controls {
+      display: none; /* Hide the old single panel */
+    }
+
+    .player-panel {
+      position: fixed;
+      top: calc(24px + 12px + 28px + 12px + 8px); /* header top + top padding + content height + bottom padding + gap */
+      width: 260px;
+      max-width: min(35vw, 300px);
+      padding: 16px;
+      max-height: calc(100vh - 104px);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .player-panel.player1 {
+      left: 20px;
+      border-left: 3px solid var(--player1-color);
+    }
+
+    .player-panel.player2 {
+      right: 20px;
+      border-left: 3px solid var(--player2-color);
+    }
+
+    .player-panel h3 {
+      margin: 0 0 12px 0;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding-bottom: 10px;
+      border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .player-panel.player1 h3 {
+      color: var(--player1-color);
+      border-bottom-color: rgba(255, 102, 0, 0.3);
+    }
+
+    .player-panel.player2 h3 {
+      color: var(--player2-color);
+      border-bottom-color: rgba(0, 170, 255, 0.3);
+    }
+
+    .search-group {
+      margin-bottom: 10px;
+    }
+
+    .search-group label {
+      display: block;
+      font-weight: 700;
+      font-size: 10px;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+      color: var(--text-muted);
+    }
+
+    .search-container {
+      position: relative;
+    }
+
+    .search-container input {
+      width: 100%;
+      padding: 10px 32px 10px 12px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 2px solid var(--panel-border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-size: 13px;
+      transition: all 0.2s ease;
+    }
+
+    .search-container input:focus {
+      outline: none;
+      border-color: var(--accent-orange);
+      background: rgba(255, 255, 255, 0.08);
+      box-shadow: 0 0 12px rgba(255, 102, 0, 0.2);
+    }
+
+    .search-icon {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 16px;
+      height: 16px;
+      color: var(--text-dim);
+      pointer-events: none;
+    }
+
+    .search-results {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      margin-top: 4px;
+      background: rgba(0, 0, 0, 0.95);
+      border: 2px solid var(--panel-border);
+      border-radius: var(--radius-sm);
+      max-height: 200px;
+      overflow-y: auto;
+      z-index: 100;
+      display: none;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    }
+
+    .search-results.show {
+      display: block;
+    }
+
+    .search-result-item {
+      padding: 10px 12px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      background: transparent;
+    }
+
+    .search-result-item:last-child {
+      border-bottom: none;
+    }
+
+    .search-result-item:hover {
+      background: rgba(255, 102, 0, 0.2);
+      border-left: 2px solid var(--accent-orange);
+      padding-left: 10px;
+    }
+
+    .player-name {
+      font-weight: 600;
+      color: var(--text);
+      font-size: 13px;
+    }
+
+    .team-name {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .switches-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin-top: 10px;
+      flex-shrink: 0;
+    }
+
+    .switch {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      user-select: none;
+    }
+
+    .switch label {
+      margin: 0;
+      font-weight: 500;
+      font-size: 12px;
+      text-transform: none;
+      letter-spacing: 0;
+      color: var(--text);
+      cursor: pointer;
+    }
+
+    .switch input {
+      appearance: none;
+      width: 36px;
+      height: 20px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 2px solid var(--panel-border);
+      cursor: pointer;
+      position: relative;
+      transition: all 0.2s ease;
+      flex-shrink: 0;
+    }
+
+    .switch input::after {
+      content: "";
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.6);
+      transition: all 0.2s ease;
+    }
+
+    .switch input:hover {
+      border-color: rgba(255, 102, 0, 0.5);
+      box-shadow: 0 0 12px rgba(255, 102, 0, 0.2);
+    }
+
+    .switch input:checked {
+      background: var(--accent-orange);
+      border-color: var(--accent-orange);
+      box-shadow: 0 0 16px var(--accent-orange-glow);
+    }
+
+    .switch input:checked::after {
+      left: 18px;
+      background: var(--white);
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+    }
+
+    .player-panel.player1 .switch input:checked {
+      background: var(--player1-color);
+      border-color: var(--player1-color);
+      box-shadow: 0 0 16px rgba(255, 102, 0, 0.5);
+    }
+
+    .player-panel.player2 .switch input:checked {
+      background: var(--player2-color);
+      border-color: var(--player2-color);
+      box-shadow: 0 0 16px rgba(0, 170, 255, 0.5);
+    }
+
+    .pitch-checkboxes {
+      margin-top: 10px;
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+
+    /* Metrics Panel */
+    .player-metrics {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      flex-shrink: 0;
+    }
+
+    .player-metrics-header {
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+      color: var(--text-muted);
+    }
+
+    .player-panel.player1 .player-metrics-header {
+      color: var(--player1-color);
+    }
+
+    .player-panel.player2 .player-metrics-header {
+      color: var(--player2-color);
+    }
+
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+
+    .metric {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--panel-border);
+      border-radius: var(--radius-sm);
+      padding: 8px;
+      text-align: center;
+    }
+
+    .metric-label {
+      font-size: 8px;
+      font-weight: 700;
+      color: var(--text-dim);
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .metric-value {
+      font-size: 18px;
+      font-weight: 900;
+      line-height: 1.1;
+      color: var(--text);
+      margin-bottom: 2px;
+    }
+
+    .metric-unit {
+      font-size: 8px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: lowercase;
+    }
+
+    .pitch-type-group {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--panel-border);
+      border-radius: var(--radius-sm);
+      padding: 8px;
+      margin-top: 8px;
+    }
+
+    .pitch-type-group:first-child {
+      margin-top: 0;
+    }
+
+    .pitch-type-title {
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.8px;
+      margin: 0 0 8px 0;
+      text-transform: uppercase;
+      padding-bottom: 6px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .checkbox-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      aspect-ratio: 1;
+    }
+
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      border-radius: var(--radius-sm);
+      transition: all 0.2s ease;
+      aspect-ratio: 1;
+    }
+
+    .checkbox-group input[type="checkbox"] {
+      appearance: none;
+      width: 100%;
+      height: 100%;
+      min-height: 28px;
+      aspect-ratio: 1;
+      border: 2px solid var(--panel-border);
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.05);
+      cursor: pointer;
+      position: relative;
+      transition: all 0.2s ease;
+      margin: 0;
+    }
+
+    .checkbox-group input[type="checkbox"]:checked {
+      background: rgba(0, 0, 0, 0.8);
+      border-color: var(--accent-orange);
+      box-shadow: 0 0 12px var(--accent-orange-glow);
+      background-image: url('./Sequence.png');
+      background-size: contain;
+      background-position: center;
+      background-repeat: no-repeat;
+    }
+
+    .player-panel.player1 .checkbox-group input[type="checkbox"]:checked {
+      border-color: var(--player1-color);
+      box-shadow: 0 0 12px rgba(255, 102, 0, 0.5);
+    }
+
+    .player-panel.player2 .checkbox-group input[type="checkbox"]:checked {
+      border-color: var(--player2-color);
+      box-shadow: 0 0 12px rgba(0, 170, 255, 0.5);
+    }
+
+    .controls-footer {
+      display: none; /* Hide the old footer */
+    }
+
+    button {
+      padding: 10px 16px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 2px solid var(--panel-border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    button:hover {
+      background: rgba(255, 102, 0, 0.2);
+      border-color: var(--accent-orange);
+      box-shadow: 0 0 12px rgba(255, 102, 0, 0.3);
+    }
+
+    button.primary {
+      background: var(--accent-orange);
+      border-color: var(--accent-orange);
+      color: var(--bg);
+    }
+
+    button.primary:hover {
+      background: var(--accent-orange-bright);
+      box-shadow: 0 0 20px var(--accent-orange-glow);
+    }
+
+    #pitchCheckboxes::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    #pitchCheckboxes::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 3px;
+    }
+
+    #pitchCheckboxes::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.3);
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="three-canvas"></canvas>
+
+  <div class="comparison-header">
+    <div class="comparison-header-left">
+      <div class="sequence-logo">
+        <img src="./Sequence.png" alt="Sequence Logo">
+      </div>
+      <h2>Pitcher Comparison</h2>
+    </div>
+    <div class="comparison-header-right">
+      <div class="header-select-group">
+        <div class="custom-dropdown" id="cameraDropdown">
+          <div class="custom-dropdown-trigger" id="cameraDropdownTrigger">
+            <span id="cameraDropdownValue">Home Plate</span>
+            <svg class="custom-dropdown-arrow" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M1 1L6 6L11 1" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.7"/>
+            </svg>
+          </div>
+          <div class="custom-dropdown-menu" id="cameraDropdownMenu">
+            <div class="custom-dropdown-item selected" data-value="catcher">Home Plate</div>
+            <div class="custom-dropdown-item" data-value="pitcher">Pitcher POV</div>
+            <div class="custom-dropdown-item" data-value="rhh">RHH POV</div>
+            <div class="custom-dropdown-item" data-value="lhh">LHH POV</div>
+            <div class="custom-dropdown-item" data-value="1b">1st Base</div>
+            <div class="custom-dropdown-item" data-value="3b">3rd Base</div>
+          </div>
+        </div>
+      </div>
+      <button id="replayBtn" class="primary">Replay</button>
+      <button id="clearBtn">Clear</button>
+      <button class="back-button" onclick="window.location.href='index.html'">Back</button>
+    </div>
+  </div>
+
+  <div class="player-panel panel player1">
+    <h3>Player 1</h3>
+      <div class="search-group">
+        <label>Search Player</label>
+        <div class="search-container">
+          <input type="text" id="player1Search" placeholder="Type player name...">
+          <svg class="search-icon" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M7 12C9.76142 12 12 9.76142 12 7C12 4.23858 9.76142 2 7 2C4.23858 2 2 4.23858 2 7C2 9.76142 4.23858 12 7 12Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M14 14L11 11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <div id="player1Results" class="search-results"></div>
+        </div>
+      </div>
+      <div class="switches-group">
+        <div class="switch">
+          <label for="player1OrbitToggle">Orbit</label>
+          <input type="checkbox" id="player1OrbitToggle" checked>
+        </div>
+        <div class="switch">
+          <label for="player1TrailToggle">Trail</label>
+          <input type="checkbox" id="player1TrailToggle">
+        </div>
+      </div>
+    <div id="player1Checkboxes" class="pitch-checkboxes"></div>
+    <div id="player1Metrics" class="player-metrics">
+      <div class="player-metrics-header">Performance Metrics</div>
+      <div class="metrics-grid">
+        <div class="metric">
+          <div class="metric-label">Velocity</div>
+          <div class="metric-value" id="p1-velo">--</div>
+          <div class="metric-unit">mph</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Spin Rate</div>
+          <div class="metric-value" id="p1-spin">--</div>
+          <div class="metric-unit">rpm</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">IVB</div>
+          <div class="metric-value" id="p1-ivb">--</div>
+          <div class="metric-unit">in</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">HB</div>
+          <div class="metric-value" id="p1-hb">--</div>
+          <div class="metric-unit">in</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="player-panel panel player2">
+    <h3>Player 2</h3>
+      <div class="search-group">
+        <label>Search Player</label>
+        <div class="search-container">
+          <input type="text" id="player2Search" placeholder="Type player name...">
+          <svg class="search-icon" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M7 12C9.76142 12 12 9.76142 12 7C12 4.23858 9.76142 2 7 2C4.23858 2 2 4.23858 2 7C2 9.76142 4.23858 12 7 12Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M14 14L11 11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <div id="player2Results" class="search-results"></div>
+        </div>
+      </div>
+      <div class="switches-group">
+        <div class="switch">
+          <label for="player2OrbitToggle">Orbit</label>
+          <input type="checkbox" id="player2OrbitToggle" checked>
+        </div>
+        <div class="switch">
+          <label for="player2TrailToggle">Trail</label>
+          <input type="checkbox" id="player2TrailToggle">
+        </div>
+      </div>
+    <div id="player2Checkboxes" class="pitch-checkboxes"></div>
+    <div id="player2Metrics" class="player-metrics">
+      <div class="player-metrics-header">Performance Metrics</div>
+      <div class="metrics-grid">
+        <div class="metric">
+          <div class="metric-label">Velocity</div>
+          <div class="metric-value" id="p2-velo">--</div>
+          <div class="metric-unit">mph</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Spin Rate</div>
+          <div class="metric-value" id="p2-spin">--</div>
+          <div class="metric-unit">rpm</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">IVB</div>
+          <div class="metric-value" id="p2-ivb">--</div>
+          <div class="metric-unit">in</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">HB</div>
+          <div class="metric-value" id="p2-hb">--</div>
+          <div class="metric-unit">in</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <script type="module" src="./comparison.js"></script>
+</body>
+</html>
+
