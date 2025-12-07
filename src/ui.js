@@ -277,7 +277,6 @@ export function initControls(data, setPlaying) {
   const cameraItems = cameraDropdownMenu.querySelectorAll('.custom-dropdown-item');
 
   const replayBtn     = document.getElementById('replayBtn');
-  const toggleBtn     = document.getElementById('toggleBtn');
   const orbitToggle   = document.getElementById('orbitToggle');
   const trailToggle   = document.getElementById('trailToggle');
   const metricsPanel  = document.getElementById('metricsPanel');
@@ -489,14 +488,6 @@ export function initControls(data, setPlaying) {
     }
     
     replayAll();
-  });
-
-  let isPlaying = true;
-  toggleBtn.addEventListener('click', () => {
-    isPlaying = !isPlaying;
-    setPlaying(isPlaying);
-    toggleBtn.textContent = isPlaying ? 'Pause' : 'Play';
-    _writeUrl();
   });
 
   trailToggle.addEventListener('change', e => { setTrailVisible(e.target.checked); _writeUrl(); });

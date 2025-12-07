@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
   <title>SEQUENCE | Pitch Comparison</title>
   <link rel="icon" href="data:,">
   <script type="importmap">
@@ -60,6 +62,8 @@
       -moz-osx-font-smoothing: grayscale;
       overflow: hidden;
       position: relative;
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
     }
 
     /* Geometric background pattern */
@@ -87,8 +91,14 @@
       height: 100vh;
       display: block;
       pointer-events: auto;
-      touch-action: none;
+      touch-action: pan-x pan-y pinch-zoom;
       z-index: 1;
+    }
+    
+    @media (max-width: 768px) {
+      #three-canvas {
+        touch-action: pan-x pan-y pinch-zoom;
+      }
     }
 
     /* Panel Base Styles */
@@ -380,6 +390,78 @@
       overflow: hidden;
     }
 
+    /* Landscape mode scrolling for player panels */
+    @media (orientation: landscape) {
+      .player-panel {
+        overflow-y: auto;
+        overflow-x: hidden;
+        touch-action: pan-y;
+        height: auto;
+      }
+
+      /* Ensure pitch checkboxes container is visible - remove nested scrolling */
+      .player-panel .pitch-checkboxes {
+        flex: 0 1 auto;
+        min-height: auto;
+        overflow: visible !important;
+        overflow-y: visible !important;
+        overflow-x: visible !important;
+        height: auto;
+      }
+
+      /* Ensure content inside pitch checkboxes is visible and expands parent */
+      .player-panel .pitch-checkboxes .pitch-type-group {
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+      }
+
+      /* Ensure interactive elements work properly inside scrollable container */
+      .player-panel input[type="checkbox"],
+      .player-panel button,
+      .player-panel .custom-dropdown-trigger,
+      .player-panel .search-container input,
+      .player-panel .switch input,
+      .player-panel .checkbox-group {
+        touch-action: manipulation;
+        pointer-events: auto;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+
+      /* Prevent scrolling when clicking on interactive elements */
+      .player-panel .checkbox-group input[type="checkbox"]:active,
+      .player-panel button:active {
+        touch-action: none;
+      }
+
+      .player-panel::-webkit-scrollbar {
+        width: 6px;
+      }
+
+      .player-panel::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 3px;
+      }
+
+      .player-panel::-webkit-scrollbar-thumb {
+        background: rgba(255, 102, 0, 0.4);
+        border-radius: 3px;
+      }
+
+      .player-panel::-webkit-scrollbar-thumb:hover {
+        background: var(--accent-orange);
+      }
+
+      .player-panel.player2::-webkit-scrollbar-thumb {
+        background: rgba(0, 170, 255, 0.4);
+      }
+
+      .player-panel.player2::-webkit-scrollbar-thumb:hover {
+        background: var(--player2-color);
+      }
+    }
+
     .player-panel.player1 {
       left: 20px;
       border-left: 3px solid var(--player1-color);
@@ -527,66 +609,69 @@
 
     .switch label {
       margin: 0;
-      font-weight: 500;
+      font-weight: 600;
       font-size: 12px;
-      text-transform: none;
-      letter-spacing: 0;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
       color: var(--text);
       cursor: pointer;
+      transition: color 0.2s ease;
+    }
+
+    .switch:hover label {
+      color: var(--text);
     }
 
     .switch input {
       appearance: none;
-      width: 36px;
-      height: 20px;
+      width: 44px;
+      height: 24px;
       border-radius: 999px;
-      background: rgba(255, 255, 255, 0.1);
-      border: 2px solid var(--panel-border);
+      background: rgba(255, 255, 255, 0.08);
+      border: 2px solid rgba(255, 255, 255, 0.2);
       cursor: pointer;
       position: relative;
-      transition: all 0.2s ease;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       flex-shrink: 0;
+      outline: none;
     }
 
     .switch input::after {
-      content: "";
-      position: absolute;
-      top: 2px;
-      left: 2px;
-      width: 14px;
-      height: 14px;
-      border-radius: 50%;
-      background: rgba(255, 255, 255, 0.6);
-      transition: all 0.2s ease;
+      display: none;
     }
 
     .switch input:hover {
-      border-color: rgba(255, 102, 0, 0.5);
-      box-shadow: 0 0 12px rgba(255, 102, 0, 0.2);
+      border-color: rgba(255, 255, 255, 0.3);
+      background: rgba(255, 255, 255, 0.12);
+      box-shadow: 0 0 12px rgba(255, 102, 0, 0.15);
     }
 
     .switch input:checked {
       background: var(--accent-orange);
       border-color: var(--accent-orange);
-      box-shadow: 0 0 16px var(--accent-orange-glow);
-    }
-
-    .switch input:checked::after {
-      left: 18px;
-      background: var(--white);
-      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+      box-shadow: 0 0 20px var(--accent-orange-glow), 0 0 40px rgba(255, 102, 0, 0.2);
     }
 
     .player-panel.player1 .switch input:checked {
       background: var(--player1-color);
       border-color: var(--player1-color);
-      box-shadow: 0 0 16px rgba(255, 102, 0, 0.5);
+      box-shadow: 0 0 20px rgba(255, 102, 0, 0.6), 0 0 40px rgba(255, 102, 0, 0.3);
     }
 
     .player-panel.player2 .switch input:checked {
       background: var(--player2-color);
       border-color: var(--player2-color);
-      box-shadow: 0 0 16px rgba(0, 170, 255, 0.5);
+      box-shadow: 0 0 20px rgba(0, 170, 255, 0.6), 0 0 40px rgba(0, 170, 255, 0.3);
+    }
+
+    .player-panel.player1 .switch input:hover:not(:checked) {
+      border-color: rgba(255, 102, 0, 0.4);
+      box-shadow: 0 0 12px rgba(255, 102, 0, 0.2);
+    }
+
+    .player-panel.player2 .switch input:hover:not(:checked) {
+      border-color: rgba(0, 170, 255, 0.4);
+      box-shadow: 0 0 12px rgba(0, 170, 255, 0.2);
     }
 
     .pitch-checkboxes {
@@ -782,6 +867,414 @@
       background: rgba(255, 255, 255, 0.3);
       border-radius: 3px;
     }
+
+    /* Responsive Styles */
+    @media (max-width: 1024px) {
+      .player-panel {
+        width: min(40vw, 240px);
+        padding: 14px;
+      }
+      
+      .comparison-header {
+        padding: 10px 16px;
+        gap: 16px;
+      }
+      
+      .comparison-header h2 {
+        font-size: 14px;
+      }
+      
+      .sequence-logo {
+        width: 40px;
+        height: 40px;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .comparison-header {
+        display: none; /* Hide header on mobile */
+      }
+      
+      .player-panel {
+        position: fixed;
+        width: calc(100vw - 32px);
+        max-width: min(88vw, 280px);
+        left: 16px;
+        right: auto;
+        top: 16px;
+        padding: 16px;
+        max-height: calc(100vh - 32px);
+        transform: translateX(calc(-100% - 48px));
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        visibility: hidden;
+        pointer-events: none;
+      }
+      
+      .player-panel.show {
+        transform: translateX(0);
+        visibility: visible;
+        pointer-events: auto;
+      }
+      
+      .player-panel.player1 {
+        border-left: 3px solid var(--player1-color);
+      }
+      
+      .player-panel.player2 {
+        border-left: 3px solid var(--player2-color);
+      }
+      
+      /* Add controls to panels on mobile */
+      .player-panel .panel-controls {
+        display: flex !important;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 12px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      
+      /* Hide panel controls on desktop */
+      @media (min-width: 769px) {
+        .player-panel .panel-controls {
+          display: none !important;
+        }
+      }
+      
+      .player-panel .panel-controls-row {
+        display: flex;
+        gap: 8px;
+      }
+      
+      .player-panel .panel-controls-row button {
+        flex: 1;
+        padding: 8px 12px;
+        font-size: 11px;
+      }
+      
+      .player-panel .panel-controls-row .custom-dropdown {
+        flex: 1;
+      }
+      
+      .player-panel .panel-controls-row .custom-dropdown-trigger {
+        padding: 8px 28px 8px 12px;
+        font-size: 11px;
+      }
+      
+      
+      .player-panel h3 {
+        font-size: 12px;
+        margin-bottom: 10px;
+        padding-bottom: 8px;
+      }
+      
+      .search-group {
+        margin-bottom: 8px;
+      }
+      
+      .search-group label {
+        font-size: 9px;
+        margin-bottom: 4px;
+      }
+      
+      .search-container input {
+        padding: 8px 28px 8px 10px;
+        font-size: 12px;
+      }
+      
+      .switches-group {
+        gap: 4px;
+        margin-top: 8px;
+      }
+      
+      .switch label {
+        font-size: 11px;
+      }
+      
+      .switch input {
+        width: 32px;
+        height: 18px;
+      }
+      
+      .switch input::after {
+        width: 12px;
+        height: 12px;
+      }
+      
+      .switch input:checked::after {
+        left: 16px;
+      }
+      
+      .pitch-checkboxes {
+        margin-top: 8px;
+      }
+      
+      .pitch-type-group {
+        padding: 6px;
+        margin-top: 6px;
+      }
+      
+      .pitch-type-title {
+        font-size: 10px;
+        margin-bottom: 6px;
+        padding-bottom: 4px;
+      }
+      
+      .checkbox-grid {
+        gap: 4px;
+      }
+      
+      .checkbox-group input[type="checkbox"] {
+        min-height: 22px;
+      }
+      
+      .player-metrics {
+        margin-top: 10px;
+        padding-top: 10px;
+      }
+      
+      .player-metrics-header {
+        font-size: 9px;
+        margin-bottom: 10px;
+      }
+      
+      .metrics-grid {
+        gap: 6px;
+      }
+      
+      .metric {
+        padding: 6px;
+      }
+      
+      .metric-label {
+        font-size: 7px;
+        margin-bottom: 3px;
+      }
+      
+      .metric-value {
+        font-size: 16px;
+        margin-bottom: 2px;
+      }
+      
+      .metric-unit {
+        font-size: 7px;
+      }
+      
+      button {
+        padding: 8px 12px;
+        font-size: 11px;
+      }
+      
+      .custom-dropdown-trigger {
+        padding: 6px 28px 6px 10px;
+        font-size: 11px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .player-panel {
+        left: 12px;
+        padding: 12px;
+        top: 12px;
+        width: calc(100vw - 24px);
+        max-width: min(88vw, 260px);
+      }
+      
+      .mobile-panel-toggle {
+        width: 44px;
+        height: 44px;
+        font-size: 16px;
+        top: 12px;
+        right: 12px;
+      }
+      
+      .mobile-panel-toggle.player1-toggle {
+        top: 12px;
+      }
+      
+      .mobile-panel-toggle.player2-toggle {
+        top: 64px;
+      }
+      
+      .mobile-back-button {
+        top: 116px;
+        right: 12px;
+        width: 44px;
+        height: 44px;
+        font-size: 16px;
+      }
+      
+      /* Ensure all buttons are aligned on small screens */
+      .mobile-panel-toggle,
+      .mobile-back-button {
+        right: 12px;
+      }
+      
+      .metrics-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 4px;
+      }
+      
+      .metric {
+        padding: 6px 4px;
+      }
+      
+      .metric-value {
+        font-size: 14px;
+      }
+      
+      .metric-label,
+      .metric-unit {
+        font-size: 6px;
+      }
+    }
+
+    /* Mobile panel toggle buttons */
+    @media (max-width: 768px) {
+      .mobile-panel-toggle {
+        position: fixed;
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: var(--accent-orange);
+        border: 2px solid var(--accent-orange);
+        color: var(--bg);
+        font-size: 18px;
+        font-weight: 700;
+        cursor: pointer;
+        z-index: 25;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 16px rgba(255, 102, 0, 0.4);
+        transition: all 0.3s ease;
+        right: 16px;
+      }
+      
+      .mobile-panel-toggle.player1-toggle {
+        top: 16px;
+        background: var(--player1-color);
+        border-color: var(--player1-color);
+      }
+      
+      .mobile-panel-toggle.player2-toggle {
+        top: 72px;
+        background: var(--player2-color);
+        border-color: var(--player2-color);
+      }
+      
+      .mobile-back-button {
+        position: fixed;
+        top: 128px;
+        right: 16px;
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.1);
+        border: 2px solid rgba(255, 255, 255, 0.2);
+        color: var(--text);
+        font-size: 18px;
+        font-weight: 700;
+        cursor: pointer;
+        z-index: 25;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+        transition: all 0.3s ease;
+      }
+      
+      .mobile-back-button:hover {
+        background: rgba(255, 255, 255, 0.15);
+        transform: scale(1.05);
+      }
+      
+      .mobile-panel-toggle:hover {
+        transform: scale(1.05);
+        box-shadow: 0 6px 20px rgba(255, 102, 0, 0.6);
+      }
+      
+      .mobile-panel-toggle.active {
+        background: var(--bg);
+        color: var(--accent-orange);
+      }
+      
+      .mobile-panel-toggle.player1-toggle.active {
+        color: var(--player1-color);
+      }
+      
+      .mobile-panel-toggle.player2-toggle.active {
+        color: var(--player2-color);
+      }
+    }
+    
+    @media (max-width: 480px) {
+      .mobile-panel-toggle {
+        width: 44px;
+        height: 44px;
+        font-size: 16px;
+        right: 12px;
+      }
+      
+      .mobile-panel-toggle.player1-toggle {
+        top: 12px;
+      }
+      
+      .mobile-panel-toggle.player2-toggle {
+        top: 64px;
+      }
+      
+      .mobile-back-button {
+        top: 116px;
+        right: 12px;
+        width: 44px;
+        height: 44px;
+        font-size: 16px;
+      }
+    }
+
+    /* Hide mobile toggles on desktop */
+    .mobile-panel-toggle,
+    .mobile-back-button {
+      display: none;
+    }
+    
+    @media (max-width: 768px) {
+      .mobile-panel-toggle,
+      .mobile-back-button {
+        display: flex;
+      }
+    }
+
+    /* Touch-friendly improvements */
+    @media (hover: none) and (pointer: coarse) {
+      button,
+      .custom-dropdown-trigger,
+      .search-container input,
+      .switch input,
+      .checkbox-group input[type="checkbox"] {
+        min-height: 44px;
+      }
+      
+      .search-result-item,
+      .custom-dropdown-item {
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+      }
+      
+      .switch {
+        padding: 8px 0;
+      }
+    }
+
+    /* Mobile landscape mode scrolling - combined query */
+    @media (max-width: 768px) and (orientation: landscape) {
+      .player-panel.show {
+        overflow-y: auto;
+        overflow-x: hidden;
+      }
+    }
   </style>
 </head>
 <body>
@@ -820,6 +1313,30 @@
   </div>
 
   <div class="player-panel panel player1">
+    <div class="panel-controls" style="display: none;">
+      <div class="panel-controls-row">
+        <div class="custom-dropdown" id="cameraDropdown">
+          <div class="custom-dropdown-trigger" id="cameraDropdownTrigger">
+            <span id="cameraDropdownValue">Home Plate</span>
+            <svg class="custom-dropdown-arrow" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M1 1L6 6L11 1" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.7"/>
+            </svg>
+          </div>
+          <div class="custom-dropdown-menu" id="cameraDropdownMenu">
+            <div class="custom-dropdown-item selected" data-value="catcher">Home Plate</div>
+            <div class="custom-dropdown-item" data-value="pitcher">Pitcher POV</div>
+            <div class="custom-dropdown-item" data-value="rhh">RHH POV</div>
+            <div class="custom-dropdown-item" data-value="lhh">LHH POV</div>
+            <div class="custom-dropdown-item" data-value="1b">1st Base</div>
+            <div class="custom-dropdown-item" data-value="3b">3rd Base</div>
+          </div>
+        </div>
+      </div>
+      <div class="panel-controls-row">
+        <button id="replayBtn" class="primary">Replay</button>
+        <button id="clearBtn">Clear</button>
+      </div>
+    </div>
     <h3>Player 1</h3>
       <div class="search-group">
         <label>Search Player</label>
@@ -921,8 +1438,197 @@
     </div>
   </div>
 
+  <button id="player1Toggle" class="mobile-panel-toggle player1-toggle" aria-label="Toggle Player 1">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M3 12H21M3 6H21M3 18H21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </button>
+  
+  <button id="player2Toggle" class="mobile-panel-toggle player2-toggle" aria-label="Toggle Player 2">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M3 12H21M3 6H21M3 18H21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </button>
+  
+  <button id="mobileBackButton" class="mobile-back-button" aria-label="Back" onclick="window.location.href='index.html'">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M19 12H5M5 12L12 19M5 12L12 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </button>
 
   <script type="module" src="./comparison.js"></script>
+  <script>
+    // Mobile panel toggles and tap-to-replay - wait for DOM to be ready
+    document.addEventListener('DOMContentLoaded', function() {
+      const player1Toggle = document.getElementById('player1Toggle');
+      const player2Toggle = document.getElementById('player2Toggle');
+      const player1Panel = document.querySelector('.player-panel.player1');
+      const player2Panel = document.querySelector('.player-panel.player2');
+      const canvas = document.getElementById('three-canvas');
+      const replayBtn = document.getElementById('replayBtn');
+      const comparisonHeader = document.querySelector('.comparison-header');
+      
+      function updatePanelPositions() {
+        if (!player1Panel || !player2Panel) return;
+        
+        const player1Open = player1Panel.classList.contains('show');
+        const player2Open = player2Panel.classList.contains('show');
+        
+        // Since only one can be open at a time, just set the top position
+        if (player1Open) {
+          player1Panel.style.top = window.innerWidth <= 480 ? 'calc(8px + 50px)' : 'calc(12px + 60px)';
+        } else if (player2Open) {
+          player2Panel.style.top = window.innerWidth <= 480 ? 'calc(8px + 50px)' : 'calc(12px + 60px)';
+        }
+      }
+      
+      if (player1Toggle && player1Panel) {
+        player1Toggle.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const isCurrentlyOpen = player1Panel.classList.contains('show');
+          
+          // Close player2 if opening player1
+          if (!isCurrentlyOpen && player2Panel && player2Panel.classList.contains('show')) {
+            player2Panel.classList.remove('show');
+            if (player2Toggle) player2Toggle.classList.remove('active');
+          }
+          
+          player1Panel.classList.toggle('show');
+          player1Toggle.classList.toggle('active');
+          updatePanelPositions();
+        });
+        
+        // Close when clicking outside
+        document.addEventListener('click', (e) => {
+          if (player1Panel && player1Toggle && 
+              !player1Panel.contains(e.target) && 
+              !player1Toggle.contains(e.target) &&
+              !player2Toggle.contains(e.target)) {
+            player1Panel.classList.remove('show');
+            player1Toggle.classList.remove('active');
+            updatePanelPositions();
+          }
+        });
+      }
+      
+      if (player2Toggle && player2Panel) {
+        player2Toggle.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const isCurrentlyOpen = player2Panel.classList.contains('show');
+          
+          // Close player1 if opening player2
+          if (!isCurrentlyOpen && player1Panel && player1Panel.classList.contains('show')) {
+            player1Panel.classList.remove('show');
+            if (player1Toggle) player1Toggle.classList.remove('active');
+          }
+          
+          player2Panel.classList.toggle('show');
+          player2Toggle.classList.toggle('active');
+          updatePanelPositions();
+        });
+        
+        // Close when clicking outside
+        document.addEventListener('click', (e) => {
+          if (player2Panel && player2Toggle && 
+              !player2Panel.contains(e.target) && 
+              !player2Toggle.contains(e.target) &&
+              !player1Toggle.contains(e.target)) {
+            player2Panel.classList.remove('show');
+            player2Toggle.classList.remove('active');
+            updatePanelPositions();
+          }
+        });
+      }
+      
+      // Tap-to-replay on canvas (mobile)
+      if (canvas && window.innerWidth <= 768) {
+        let touchStartTime = 0;
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let isDragging = false;
+        
+        // Handle touch events for tap detection
+        canvas.addEventListener('touchstart', (e) => {
+          touchStartTime = new Date().getTime();
+          touchStartX = e.touches[0].clientX;
+          touchStartY = e.touches[0].clientY;
+          isDragging = false;
+        }, { passive: true });
+        
+        canvas.addEventListener('touchmove', (e) => {
+          // If user moves finger, it's a drag, not a tap
+          if (touchStartTime) {
+            const deltaX = Math.abs(e.touches[0].clientX - touchStartX);
+            const deltaY = Math.abs(e.touches[0].clientY - touchStartY);
+            if (deltaX > 5 || deltaY > 5) {
+              isDragging = true;
+            }
+          }
+        }, { passive: true });
+        
+        canvas.addEventListener('touchend', (e) => {
+          if (!touchStartTime) return;
+          
+          const touchEndTime = new Date().getTime();
+          const touchDuration = touchEndTime - touchStartTime;
+          
+          // Don't replay if clicking on a panel, header, or toggle button
+          const touchEndX = e.changedTouches[0].clientX;
+          const touchEndY = e.changedTouches[0].clientY;
+          const touchTarget = document.elementFromPoint(touchEndX, touchEndY);
+          
+          if (player1Panel && player1Panel.contains(touchTarget)) {
+            touchStartTime = 0;
+            return;
+          }
+          if (player2Panel && player2Panel.contains(touchTarget)) {
+            touchStartTime = 0;
+            return;
+          }
+          if (comparisonHeader && comparisonHeader.contains(touchTarget)) {
+            touchStartTime = 0;
+            return;
+          }
+          if (player1Toggle && player1Toggle.contains(touchTarget)) {
+            touchStartTime = 0;
+            return;
+          }
+          if (player2Toggle && player2Toggle.contains(touchTarget)) {
+            touchStartTime = 0;
+            return;
+          }
+          
+          // Check if it's a tap (not a drag) - less than 300ms and less than 10px movement
+          const deltaX = Math.abs(touchEndX - touchStartX);
+          const deltaY = Math.abs(touchEndY - touchStartY);
+          const isTap = !isDragging && touchDuration < 300 && deltaX < 10 && deltaY < 10;
+          
+          if (isTap && replayBtn) {
+            e.preventDefault();
+            replayBtn.click();
+          }
+          
+          touchStartTime = 0;
+          isDragging = false;
+        }, { passive: false });
+        
+        // Also handle mouse clicks for testing on desktop
+        canvas.addEventListener('click', (e) => {
+          // Don't replay if clicking on a panel, header, or toggle button
+          if (player1Panel && player1Panel.contains(e.target)) return;
+          if (player2Panel && player2Panel.contains(e.target)) return;
+          if (comparisonHeader && comparisonHeader.contains(e.target)) return;
+          if (player1Toggle && player1Toggle.contains(e.target)) return;
+          if (player2Toggle && player2Toggle.contains(e.target)) return;
+          
+          // Only trigger on mobile viewport
+          if (window.innerWidth <= 768 && replayBtn) {
+            replayBtn.click();
+          }
+        });
+      }
+    });
+  </script>
 </body>
 </html>
 
