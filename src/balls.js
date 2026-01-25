@@ -234,6 +234,34 @@ export function replayAll() {
 export function animateBalls(delta) {
   const { scene, renderer, camera, clock, controls } = getRefs();
   const now = clock.getElapsedTime();
+  const Z_PLATE = -60.5;
+
+  function solveTimeAtZ({ releaseZ, vZ, aZ, zTarget }) {
+    // Solve: releaseZ + vZ*t + 0.5*aZ*t^2 = zTarget
+    // => (0.5*aZ)*t^2 + vZ*t + (releaseZ - zTarget) = 0
+    const a = 0.5 * aZ;
+    const b = vZ;
+    const c = releaseZ - zTarget;
+
+    // Near-linear case
+    if (Math.abs(a) < 1e-8) {
+      if (Math.abs(b) < 1e-8) return null;
+      const t = -c / b;
+      return Number.isFinite(t) ? t : null;
+    }
+
+    const disc = b * b - 4 * a * c;
+    if (disc < 0) return null;
+    const s = Math.sqrt(disc);
+
+    const t1 = (-b - s) / (2 * a);
+    const t2 = (-b + s) / (2 * a);
+
+    let best = null;
+    if (t1 > 0 && Number.isFinite(t1)) best = t1;
+    if (t2 > 0 && Number.isFinite(t2)) best = best === null ? t2 : Math.min(best, t2);
+    return best;
+  }
 
   // Remove balls and their trails 3 seconds after they reach the plate
   balls = balls.filter(ball => {
@@ -263,14 +291,25 @@ export function animateBalls(delta) {
     // Check if ball has reached the plate
     const z = release.z + velocity.z * t + 0.5 * accel.z * t * t;
     
-    if (z <= -60.5 && finishedAt === null) {
-      // Ball just reached the plate - mark the finish time
-      ball.userData.finishedAt = now;
-      
-      // Set final position at the plate
-      const finalX = release.x + velocity.x * t + 0.5 * accel.x * t * t;
-      const finalY = release.y + velocity.y * t + 0.5 * accel.y * t * t;
-      ball.position.set(finalX, finalY, -60.5);
+    if (z <= Z_PLATE && finishedAt === null) {
+      // Ball just reached the plate - compute the exact crossing time so the final step
+      // doesn't "snap" based on variable dt.
+      const tPlate = solveTimeAtZ({
+        releaseZ: release.z,
+        vZ: velocity.z,
+        aZ: accel.z,
+        zTarget: Z_PLATE
+      });
+
+      const tf = (tPlate !== null && tPlate <= t) ? tPlate : t;
+
+      // Mark the finish time at the exact crossing (not the current frame time).
+      ball.userData.finishedAt = t0 + tf;
+
+      // Set final position at the plate using the same tf so x/y/z are consistent.
+      const finalX = release.x + velocity.x * tf + 0.5 * accel.x * tf * tf;
+      const finalY = release.y + velocity.y * tf + 0.5 * accel.y * tf * tf;
+      ball.position.set(finalX, finalY, Z_PLATE);
       
       // Finalize the trail - make sure it goes to the plate
       if (showTrail && ball.userData.trailPoints.length > 0) {
