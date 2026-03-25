@@ -2,7 +2,7 @@ import { clearBalls, clearTrails, addBall, removeBallByType, setTrailVisible, re
 import { setCameraView, getRefs } from './scene.js';
 import { Bus } from './data.js';
 
-let _state = { team: null, pitcher: null };
+let _state = { league: 'MLB', team: null, pitcher: null };
 let _lastDatum = null;
 
 function fmt(v, d = 1) {
@@ -27,6 +27,24 @@ function getVal(obj, candidates) {
     }
   }
   return undefined;
+}
+
+function normalizeSearchText(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+function buildNameVariants(name) {
+  const normalized = normalizeSearchText(name);
+  const variants = new Set([normalized]);
+  if (name && name.includes(',')) {
+    const [last, first] = name.split(',').map(s => s.trim()).filter(Boolean);
+    if (first && last) variants.add(normalizeSearchText(`${first} ${last}`));
+  }
+  return Array.from(variants).filter(Boolean);
 }
 
 function buildMetricsPanel(el) {
@@ -260,118 +278,205 @@ export function buildPitchCheckboxes(pitcherData) {
 
 export function initControls(data, setPlaying) {
   // Custom dropdown elements
+  const leagueDropdown = document.getElementById('leagueDropdown');
+  const leagueDropdownTrigger = document.getElementById('leagueDropdownTrigger');
+  const leagueDropdownValue = document.getElementById('leagueDropdownValue');
+  const leagueDropdownMenu = document.getElementById('leagueDropdownMenu');
+
   const teamDropdown = document.getElementById('teamDropdown');
   const teamDropdownTrigger = document.getElementById('teamDropdownTrigger');
   const teamDropdownValue = document.getElementById('teamDropdownValue');
   const teamDropdownMenu = document.getElementById('teamDropdownMenu');
-  
+
   const pitcherDropdown = document.getElementById('pitcherDropdown');
   const pitcherDropdownTrigger = document.getElementById('pitcherDropdownTrigger');
   const pitcherDropdownValue = document.getElementById('pitcherDropdownValue');
   const pitcherDropdownMenu = document.getElementById('pitcherDropdownMenu');
-  
+
   const cameraDropdown = document.getElementById('cameraDropdown');
   const cameraDropdownTrigger = document.getElementById('cameraDropdownTrigger');
   const cameraDropdownValue = document.getElementById('cameraDropdownValue');
   const cameraDropdownMenu = document.getElementById('cameraDropdownMenu');
   const cameraItems = cameraDropdownMenu.querySelectorAll('.custom-dropdown-item');
 
-  const replayBtn     = document.getElementById('replayBtn');
-  const orbitToggle   = document.getElementById('orbitToggle');
-  const trailToggle   = document.getElementById('trailToggle');
-  const metricsPanel  = document.getElementById('metricsPanel');
-  const playerSearch  = document.getElementById('playerSearch');
+  const replayBtn = document.getElementById('replayBtn');
+  const orbitToggle = document.getElementById('orbitToggle');
+  const trailToggle = document.getElementById('trailToggle');
+  const metricsPanel = document.getElementById('metricsPanel');
+  const playerSearch = document.getElementById('playerSearch');
   const searchResults = document.getElementById('searchResults');
 
-  // Build player index for search
-  const playerIndex = [];
-  for (const team in data) {
-    for (const pitcher in data[team]) {
-      playerIndex.push({
-        team,
-        pitcher,
-        displayName: pitcher,
-        searchText: `${pitcher} ${team}`.toLowerCase()
+  function currentLeagueData() {
+    return data[_state.league] || {};
+  }
+
+  function clearPitchSelection() {
+    clearBalls();
+    _lastDatum = null;
+    renderMetrics(metricsFromDatum(null));
+    const container = document.getElementById('pitchCheckboxes');
+    if (container) container.innerHTML = '';
+  }
+
+  function applyPitcherSelection(pitcher, closeDropdown = true) {
+    _state.pitcher = pitcher;
+    pitcherDropdownValue.textContent = pitcher;
+    if (closeDropdown) pitcherDropdown.classList.remove('open');
+    clearPitchSelection();
+    const leagueData = currentLeagueData();
+    if (_state.team && _state.pitcher && leagueData[_state.team] && leagueData[_state.team][_state.pitcher]) {
+      buildPitchCheckboxes(leagueData[_state.team][_state.pitcher]);
+    }
+    _writeUrl();
+  }
+
+  function populatePitchers(preferredPitcher = null) {
+    const leagueData = currentLeagueData();
+    pitcherDropdownMenu.innerHTML = '';
+    pitcherDropdownValue.textContent = 'Select Pitcher';
+    _state.pitcher = null;
+
+    if (!_state.team || !leagueData[_state.team]) return;
+    const pitchers = Object.keys(leagueData[_state.team]);
+    pitchers.forEach((p) => {
+      const pitcherItem = document.createElement('div');
+      pitcherItem.className = 'custom-dropdown-item';
+      pitcherItem.dataset.value = p;
+      pitcherItem.textContent = p;
+      pitcherItem.addEventListener('click', () => {
+        pitcherDropdownMenu.querySelectorAll('.custom-dropdown-item').forEach(i => i.classList.remove('selected'));
+        pitcherItem.classList.add('selected');
+        applyPitcherSelection(p, true);
       });
+      pitcherDropdownMenu.appendChild(pitcherItem);
+    });
+
+    const wanted = preferredPitcher && pitchers.includes(preferredPitcher) ? preferredPitcher : null;
+    if (wanted) {
+      const wantedItem = Array.from(pitcherDropdownMenu.children).find(item => item.dataset.value === wanted);
+      if (wantedItem) wantedItem.classList.add('selected');
+      applyPitcherSelection(wanted, false);
     }
   }
 
-  // Player search functionality
+  function applyTeamSelection(team, preferredPitcher = null, closeDropdown = true) {
+    _state.team = team;
+    teamDropdownValue.textContent = team;
+    if (closeDropdown) teamDropdown.classList.remove('open');
+    clearPitchSelection();
+    populatePitchers(preferredPitcher);
+    _writeUrl();
+  }
+
+  function populateTeams(preferredTeam = null, preferredPitcher = null) {
+    const leagueData = currentLeagueData();
+    teamDropdownMenu.innerHTML = '';
+    teamDropdownValue.textContent = 'Select Team';
+    _state.team = null;
+
+    const teams = Object.keys(leagueData);
+    teams.forEach((team) => {
+      const item = document.createElement('div');
+      item.className = 'custom-dropdown-item';
+      item.dataset.value = team;
+      item.textContent = team;
+      item.addEventListener('click', () => {
+        teamDropdownMenu.querySelectorAll('.custom-dropdown-item').forEach(i => i.classList.remove('selected'));
+        item.classList.add('selected');
+        applyTeamSelection(team);
+      });
+      teamDropdownMenu.appendChild(item);
+    });
+
+    const wanted = preferredTeam && teams.includes(preferredTeam) ? preferredTeam : null;
+    if (wanted) {
+      const wantedItem = Array.from(teamDropdownMenu.children).find(item => item.dataset.value === wanted);
+      if (wantedItem) wantedItem.classList.add('selected');
+      applyTeamSelection(wanted, preferredPitcher, false);
+    } else if (teams.length > 0) {
+      const firstItem = teamDropdownMenu.children[0];
+      firstItem.classList.add('selected');
+      applyTeamSelection(firstItem.dataset.value, null, false);
+    }
+  }
+
+  function applyLeagueSelection(league, preferredTeam = null, preferredPitcher = null, closeDropdown = true) {
+    _state.league = league;
+    leagueDropdownValue.textContent = league;
+    if (closeDropdown) leagueDropdown.classList.remove('open');
+    leagueDropdownMenu.querySelectorAll('.custom-dropdown-item').forEach(i => i.classList.remove('selected'));
+    const selectedLeagueItem = Array.from(leagueDropdownMenu.children).find(item => item.dataset.value === league);
+    if (selectedLeagueItem) selectedLeagueItem.classList.add('selected');
+    populateTeams(preferredTeam, preferredPitcher);
+    _writeUrl();
+  }
+
+  function buildPlayerIndex() {
+    const index = [];
+    for (const league of Object.keys(data)) {
+      const leagueData = data[league] || {};
+      for (const team in leagueData) {
+        for (const pitcher in leagueData[team]) {
+          const nameVariants = buildNameVariants(pitcher);
+          const tokens = normalizeSearchText(`${nameVariants.join(' ')} ${team} ${league}`).split(' ').filter(Boolean);
+          index.push({
+            league,
+            team,
+            pitcher,
+            displayName: pitcher,
+            searchText: normalizeSearchText(`${pitcher} ${team} ${league}`),
+            nameVariants,
+            tokens
+          });
+        }
+      }
+    }
+    return index;
+  }
+
+  // Player search functionality (scoped to selected league)
   let searchTimeout;
   playerSearch.addEventListener('input', (e) => {
     const query = e.target.value.trim().toLowerCase();
-    
+
     clearTimeout(searchTimeout);
     searchTimeout = setTimeout(() => {
       searchResults.innerHTML = '';
       searchResults.classList.remove('show');
-      
-      if (query.length < 2) {
-        return;
-      }
 
+      if (query.length < 2) return;
+      const queryNormalized = normalizeSearchText(query);
+      const queryTokens = queryNormalized.split(' ').filter(Boolean);
+      const playerIndex = buildPlayerIndex();
       const matches = playerIndex
-        .filter(player => player.searchText.includes(query))
-        .slice(0, 10); // Limit to 10 results
+        .filter((player) => {
+          const tokenMatch = queryTokens.every(t => player.tokens.includes(t));
+          const textMatch = player.searchText.includes(queryNormalized) || player.nameVariants.some(v => v.includes(queryNormalized));
+          return tokenMatch || textMatch;
+        })
+        .slice(0, 10);
+      if (matches.length === 0) return;
 
-      if (matches.length > 0) {
-        matches.forEach(player => {
-          const item = document.createElement('div');
-          item.className = 'search-result-item';
-          item.innerHTML = `
-            <div class="player-name">${player.displayName}</div>
-            <div class="team-name">${player.team}</div>
-          `;
-          item.addEventListener('click', () => {
-            // Update team dropdown
-            const teamItem = Array.from(teamDropdownMenu.children).find(item => item.dataset.value === player.team);
-            if (teamItem) {
-              teamDropdownMenu.querySelectorAll('.custom-dropdown-item').forEach(i => i.classList.remove('selected'));
-              teamItem.classList.add('selected');
-              teamDropdownValue.textContent = player.team;
-              _state.team = player.team;
-              
-              // Update pitcher dropdown
-              pitcherDropdownMenu.innerHTML = '';
-              for (const p in data[_state.team]) {
-                const item = document.createElement('div');
-                item.className = 'custom-dropdown-item';
-                item.dataset.value = p;
-                item.textContent = p;
-                if (p === player.pitcher) {
-                  item.classList.add('selected');
-                  pitcherDropdownValue.textContent = p;
-                }
-                item.addEventListener('click', () => {
-                  pitcherDropdownMenu.querySelectorAll('.custom-dropdown-item').forEach(i => i.classList.remove('selected'));
-                  item.classList.add('selected');
-                  pitcherDropdownValue.textContent = p;
-                  pitcherDropdown.classList.remove('open');
-                  _state.pitcher = p;
-                  clearBalls();
-                  buildPitchCheckboxes(data[_state.team][_state.pitcher]);
-                  _lastDatum = null;
-                  renderMetrics(metricsFromDatum(null));
-                  _writeUrl();
-                });
-                pitcherDropdownMenu.appendChild(item);
-              }
-              _state.pitcher = player.pitcher;
-              clearBalls();
-              buildPitchCheckboxes(data[_state.team][_state.pitcher]);
-              _lastDatum = null;
-              renderMetrics(metricsFromDatum(null));
-              _writeUrl();
-            }
-            
-            // Clear search
-            playerSearch.value = '';
-            searchResults.classList.remove('show');
-          });
-          searchResults.appendChild(item);
+      matches.forEach(player => {
+        const item = document.createElement('div');
+        item.className = 'search-result-item';
+        item.innerHTML = `
+          <div class="player-name">${player.displayName}</div>
+          <div class="team-name">${player.team} (${player.league})</div>
+        `;
+        item.addEventListener('click', () => {
+          const leagueItem = Array.from(leagueDropdownMenu.children).find(i => i.dataset.value === player.league);
+          if (leagueItem) {
+            leagueDropdownMenu.querySelectorAll('.custom-dropdown-item').forEach(i => i.classList.remove('selected'));
+            leagueItem.classList.add('selected');
+          }
+          applyLeagueSelection(player.league, player.team, player.pitcher, false);
+          playerSearch.value = '';
+          searchResults.classList.remove('show');
         });
-        searchResults.classList.add('show');
-      }
+        searchResults.appendChild(item);
+      });
+      searchResults.classList.add('show');
     }, 150);
   });
 
@@ -383,45 +488,16 @@ export function initControls(data, setPlaying) {
     }
   });
 
-  // Populate team dropdown
-  for (const team in data) {
-    const item = document.createElement('div');
-    item.className = 'custom-dropdown-item';
-    item.dataset.value = team;
-    item.textContent = team;
+  // League dropdown events
+  leagueDropdownTrigger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    leagueDropdown.classList.toggle('open');
+  });
+  leagueDropdownMenu.querySelectorAll('.custom-dropdown-item').forEach((item) => {
     item.addEventListener('click', () => {
-      teamDropdownMenu.querySelectorAll('.custom-dropdown-item').forEach(i => i.classList.remove('selected'));
-      item.classList.add('selected');
-      teamDropdownValue.textContent = team;
-      teamDropdown.classList.remove('open');
-      _state.team = team;
-      
-      // Populate pitcher dropdown
-      pitcherDropdownMenu.innerHTML = '';
-      pitcherDropdownValue.textContent = 'Select Pitcher';
-      for (const p in data[_state.team]) {
-        const pitcherItem = document.createElement('div');
-        pitcherItem.className = 'custom-dropdown-item';
-        pitcherItem.dataset.value = p;
-        pitcherItem.textContent = p;
-        pitcherItem.addEventListener('click', () => {
-          pitcherDropdownMenu.querySelectorAll('.custom-dropdown-item').forEach(i => i.classList.remove('selected'));
-          pitcherItem.classList.add('selected');
-          pitcherDropdownValue.textContent = p;
-          pitcherDropdown.classList.remove('open');
-          _state.pitcher = p;
-          clearBalls();
-          buildPitchCheckboxes(data[_state.team][_state.pitcher]);
-          _lastDatum = null;
-          renderMetrics(metricsFromDatum(null));
-          _writeUrl();
-        });
-        pitcherDropdownMenu.appendChild(pitcherItem);
-      }
-      _writeUrl();
+      applyLeagueSelection(item.dataset.value);
     });
-    teamDropdownMenu.appendChild(item);
-  }
+  });
 
   // Team dropdown toggle
   teamDropdownTrigger.addEventListener('click', (e) => {
@@ -459,6 +535,9 @@ export function initControls(data, setPlaying) {
 
   // Close dropdowns when clicking outside
   document.addEventListener('click', (e) => {
+    if (!leagueDropdown.contains(e.target)) {
+      leagueDropdown.classList.remove('open');
+    }
     if (!teamDropdown.contains(e.target)) {
       teamDropdown.classList.remove('open');
     }
@@ -474,8 +553,9 @@ export function initControls(data, setPlaying) {
     clearTrails();
     
     // Re-add any selected pitches that were removed
-    if (_state.team && _state.pitcher && data[_state.team] && data[_state.team][_state.pitcher]) {
-      const pitcherData = data[_state.team][_state.pitcher];
+    const leagueData = currentLeagueData();
+    if (_state.team && _state.pitcher && leagueData[_state.team] && leagueData[_state.team][_state.pitcher]) {
+      const pitcherData = leagueData[_state.team][_state.pitcher];
       const checkedBoxes = document.querySelectorAll('#pitchCheckboxes input[type="checkbox"]:checked');
       
       checkedBoxes.forEach(cb => {
@@ -543,58 +623,18 @@ export function initControls(data, setPlaying) {
   });
 
   const params = new URLSearchParams(location.search);
+  const wantLeague = params.get('league');
   const wantTeam = params.get('team');
   const wantPitcher = params.get('pitcher');
   const wantView = params.get('view');
   const wantTrail = params.get('trail');
   const wantOrbit = params.get('orbit');
-
-  if (wantTeam && data[wantTeam]) {
-    const teamItem = Array.from(teamDropdownMenu.children).find(item => item.dataset.value === wantTeam);
-    if (teamItem) {
-      teamDropdownMenu.querySelectorAll('.custom-dropdown-item').forEach(i => i.classList.remove('selected'));
-      teamItem.classList.add('selected');
-      teamDropdownValue.textContent = wantTeam;
-      _state.team = wantTeam;
-      
-      // Populate pitcher dropdown
-      pitcherDropdownMenu.innerHTML = '';
-      for (const p in data[_state.team]) {
-        const pitcherItem = document.createElement('div');
-        pitcherItem.className = 'custom-dropdown-item';
-        pitcherItem.dataset.value = p;
-        pitcherItem.textContent = p;
-        if (wantPitcher && p === wantPitcher) {
-          pitcherItem.classList.add('selected');
-          pitcherDropdownValue.textContent = p;
-          _state.pitcher = p;
-          clearBalls();
-          buildPitchCheckboxes(data[_state.team][_state.pitcher]);
-          _lastDatum = null;
-          renderMetrics(metricsFromDatum(null));
-        }
-        pitcherItem.addEventListener('click', () => {
-          pitcherDropdownMenu.querySelectorAll('.custom-dropdown-item').forEach(i => i.classList.remove('selected'));
-          pitcherItem.classList.add('selected');
-          pitcherDropdownValue.textContent = p;
-          pitcherDropdown.classList.remove('open');
-          _state.pitcher = p;
-          clearBalls();
-          buildPitchCheckboxes(data[_state.team][_state.pitcher]);
-          _lastDatum = null;
-          renderMetrics(metricsFromDatum(null));
-          _writeUrl();
-        });
-        pitcherDropdownMenu.appendChild(pitcherItem);
-      }
-      _writeUrl();
-    }
-  } else {
-    // Select first team
-    const firstTeamItem = teamDropdownMenu.children[0];
-    if (firstTeamItem) {
-      firstTeamItem.click();
-    }
+  const leagues = Object.keys(data);
+  const resolvedLeague = wantLeague && leagues.includes(wantLeague)
+    ? wantLeague
+    : (leagues.includes('MLB') ? 'MLB' : leagues[0]);
+  if (resolvedLeague) {
+    applyLeagueSelection(resolvedLeague, wantTeam, wantPitcher, false);
   }
 
   if (wantView) {
@@ -624,6 +664,7 @@ export function initControls(data, setPlaying) {
   function _writeUrl() {
     const cameraValue = Array.from(cameraItems).find(item => item.classList.contains('selected'))?.dataset.value || '';
     const q = new URLSearchParams({
+      league: _state.league || '',
       team: _state.team || '',
       pitcher: _state.pitcher || '',
       view: cameraValue,

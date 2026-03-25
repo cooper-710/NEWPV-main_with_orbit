@@ -16,6 +16,24 @@ let player2Pitcher = null;
 let player1LastDatum = null;
 let player2LastDatum = null;
 
+function normalizeSearchText(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+function buildNameVariants(name) {
+  const normalized = normalizeSearchText(name);
+  const variants = new Set([normalized]);
+  if (name && name.includes(',')) {
+    const [last, first] = name.split(',').map(s => s.trim()).filter(Boolean);
+    if (first && last) variants.add(normalizeSearchText(`${first} ${last}`));
+  }
+  return Array.from(variants).filter(Boolean);
+}
+
 // Helper functions for metrics
 function fmt(v, d = 1) {
   if (v === undefined || v === null || !isFinite(v)) return '--';
@@ -103,7 +121,7 @@ function renderPlayerMetrics(playerId, metrics) {
 
 // Initialize scene
 initScene();
-data = await loadPitchData();
+data = await loadPitchData({ groupByLeague: true });
 
 // Setup orbit and trail toggles - these are global controls (not per-player)
 const orbitToggle1 = document.getElementById('player1OrbitToggle');
@@ -176,14 +194,22 @@ document.addEventListener('click', (e) => {
 
 // Build player index
 const playerIndex = [];
-for (const team in data) {
-  for (const pitcher in data[team]) {
-    playerIndex.push({
-      team,
-      pitcher,
-      displayName: pitcher,
-      searchText: `${pitcher} ${team}`.toLowerCase()
-    });
+for (const league of Object.keys(data)) {
+  const leagueData = data[league] || {};
+  for (const team in leagueData) {
+    for (const pitcher in leagueData[team]) {
+      const nameVariants = buildNameVariants(pitcher);
+      const tokens = normalizeSearchText(`${nameVariants.join(' ')} ${team} ${league}`).split(' ').filter(Boolean);
+      playerIndex.push({
+        league,
+        team,
+        pitcher,
+        displayName: pitcher,
+        searchText: normalizeSearchText(`${pitcher} ${team} ${league}`),
+        nameVariants,
+        tokens
+      });
+    }
   }
 }
 
@@ -193,7 +219,7 @@ const player1Results = document.getElementById('player1Results');
 let searchTimeout1;
 
 player1Search.addEventListener('input', (e) => {
-  const query = e.target.value.trim().toLowerCase();
+  const query = e.target.value.trim();
   
   clearTimeout(searchTimeout1);
   searchTimeout1 = setTimeout(() => {
@@ -204,8 +230,14 @@ player1Search.addEventListener('input', (e) => {
       return;
     }
 
+    const queryNormalized = normalizeSearchText(query);
+    const queryTokens = queryNormalized.split(' ').filter(Boolean);
     const matches = playerIndex
-      .filter(player => player.searchText.includes(query))
+      .filter(player => {
+        const tokenMatch = queryTokens.every(t => player.tokens.includes(t));
+        const textMatch = player.searchText.includes(queryNormalized) || player.nameVariants.some(v => v.includes(queryNormalized));
+        return tokenMatch || textMatch;
+      })
       .slice(0, 10);
 
     if (matches.length > 0) {
@@ -214,13 +246,13 @@ player1Search.addEventListener('input', (e) => {
         item.className = 'search-result-item';
         item.innerHTML = `
           <div class="player-name">${player.displayName}</div>
-          <div class="team-name">${player.team}</div>
+          <div class="team-name">${player.team} (${player.league})</div>
         `;
         item.addEventListener('click', () => {
           player1Team = player.team;
           player1Pitcher = player.pitcher;
-          player1Data = data[player.team][player.pitcher];
-          player1Search.value = `${player.displayName} (${player.team})`;
+          player1Data = data[player.league][player.team][player.pitcher];
+          player1Search.value = `${player.displayName} (${player.team}, ${player.league})`;
           player1Results.classList.remove('show');
           document.querySelector('.player-panel.player1 h3').textContent = player.displayName;
           buildPitchCheckboxes('player1', player1Data, '#ff6600');
@@ -238,7 +270,7 @@ const player2Results = document.getElementById('player2Results');
 let searchTimeout2;
 
 player2Search.addEventListener('input', (e) => {
-  const query = e.target.value.trim().toLowerCase();
+  const query = e.target.value.trim();
   
   clearTimeout(searchTimeout2);
   searchTimeout2 = setTimeout(() => {
@@ -249,8 +281,14 @@ player2Search.addEventListener('input', (e) => {
       return;
     }
 
+    const queryNormalized = normalizeSearchText(query);
+    const queryTokens = queryNormalized.split(' ').filter(Boolean);
     const matches = playerIndex
-      .filter(player => player.searchText.includes(query))
+      .filter(player => {
+        const tokenMatch = queryTokens.every(t => player.tokens.includes(t));
+        const textMatch = player.searchText.includes(queryNormalized) || player.nameVariants.some(v => v.includes(queryNormalized));
+        return tokenMatch || textMatch;
+      })
       .slice(0, 10);
 
     if (matches.length > 0) {
@@ -259,13 +297,13 @@ player2Search.addEventListener('input', (e) => {
         item.className = 'search-result-item';
         item.innerHTML = `
           <div class="player-name">${player.displayName}</div>
-          <div class="team-name">${player.team}</div>
+          <div class="team-name">${player.team} (${player.league})</div>
         `;
         item.addEventListener('click', () => {
           player2Team = player.team;
           player2Pitcher = player.pitcher;
-          player2Data = data[player.team][player.pitcher];
-          player2Search.value = `${player.displayName} (${player.team})`;
+          player2Data = data[player.league][player.team][player.pitcher];
+          player2Search.value = `${player.displayName} (${player.team}, ${player.league})`;
           player2Results.classList.remove('show');
           document.querySelector('.player-panel.player2 h3').textContent = player.displayName;
           buildPitchCheckboxes('player2', player2Data, '#00aaff');

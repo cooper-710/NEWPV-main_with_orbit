@@ -14,7 +14,7 @@ function setPlaying(updateFnOrBool) {
 }
 
 initScene();
-const data = await loadPitchData();
+const data = await loadPitchData({ groupByLeague: true });
 initControls(data, setPlaying);
 
 // render loop
