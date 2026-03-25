@@ -904,6 +904,9 @@
         top: 16px;
         padding: 16px;
         max-height: calc(100vh - 32px);
+        overflow-y: auto;
+        overflow-x: hidden;
+        touch-action: pan-y;
         transform: translateX(calc(-100% - 48px));
         transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         visibility: hidden;
@@ -1007,6 +1010,9 @@
       
       .pitch-checkboxes {
         margin-top: 8px;
+        flex: 0 0 auto;
+        min-height: auto;
+        overflow: visible;
       }
       
       .pitch-type-group {
@@ -1078,6 +1084,8 @@
         top: 12px;
         width: calc(100vw - 24px);
         max-width: min(88vw, 260px);
+        overflow-y: auto;
+        overflow-x: hidden;
       }
       
       .mobile-panel-toggle {

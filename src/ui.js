@@ -649,6 +649,8 @@ export function initControls(data, setPlaying) {
   if (wantTrail) {
     trailToggle.checked = (wantTrail === '1' || wantTrail === 'true');
     trailToggle.dispatchEvent(new Event('change'));
+  } else {
+    setTrailVisible(!!trailToggle.checked);
   }
   if (wantOrbit !== null) {
     const on = (wantOrbit === '1' || wantOrbit === 'true');
@@ -656,9 +658,9 @@ export function initControls(data, setPlaying) {
     const { controls } = getRefs();
     if (controls) controls.enabled = on;
   } else {
-    orbitToggle.checked = true;
+    orbitToggle.checked = false;
     const { controls } = getRefs();
-    if (controls) controls.enabled = true;
+    if (controls) controls.enabled = false;
   }
 
   function _writeUrl() {
