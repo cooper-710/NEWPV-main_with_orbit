@@ -3,6 +3,7 @@ import { createHalfColorMaterial, getSpinAxisVector } from './materials.js';
 import { pitchColorMap } from './constants.js';
 import { getRefs } from './scene.js';
 import { Bus } from './data.js';
+import { pitchVelocityMph } from './velocity.js';
 
 let balls = [];
 let showTrail = false;
@@ -158,17 +159,7 @@ export function addBall(pitch, pitchType, playerColor = null) {
   );
   ball.castShadow = true;
 
-  const FT_PER_S_TO_MPH = 0.681818;
-
-  let mphDisplay;
-  if (typeof pitch.release_speed === 'number' && isFinite(pitch.release_speed)) {
-    mphDisplay = pitch.release_speed * FT_PER_S_TO_MPH;
-  } else if (typeof pitch.release_speed_mph === 'number' && isFinite(pitch.release_speed_mph)) {
-    mphDisplay = pitch.release_speed_mph;
-  } else {
-    const v3dFtPerS = Math.hypot(pitch.vx0 || 0, pitch.vy0 || 0, pitch.vz0 || 0);
-    mphDisplay = v3dFtPerS * FT_PER_S_TO_MPH;
-  }
+  const mphDisplay = pitchVelocityMph(pitch) || 0;
 
   const t0 = clock.getElapsedTime();
   ball.userData = {

@@ -1,6 +1,7 @@
 import { clearBalls, clearTrails, addBall, removeBallByType, setTrailVisible, replayAll, hasBallOfType } from './balls.js';
 import { setCameraView, getRefs } from './scene.js';
 import { Bus } from './data.js';
+import { pitchVelocityMph } from './velocity.js';
 
 let _state = { league: 'MLB', team: null, pitcher: null };
 let _lastDatum = null;
@@ -154,19 +155,7 @@ function metricsFromDatum(d) {
     timeToPlate: undefined, vertBreak: undefined, horizBreak: undefined, releaseSpeed: undefined
   };
 
-  // Convert velocity to mph - if value is > 100, assume it's in ft/s and convert
-  let mphRaw = pick(d.mph, d.velocity, d.vel, d.release_speed);
-  let mph;
-  if (mphRaw !== undefined) {
-    // If value is > 100, it's likely in ft/s, convert to mph
-    if (mphRaw > 100) {
-      mph = mphRaw * 0.681818; // ft/s to mph conversion
-    } else {
-      mph = mphRaw; // Already in mph
-    }
-  } else {
-    mph = undefined;
-  }
+  const mph = pitchVelocityMph(d);
   const spin = pick(d.spin, d.rpm, d.release_spin_rate);
   const ivb  = trackmanIVBInches(d);
 
@@ -603,18 +592,7 @@ export function initControls(data, setPlaying) {
       try { console.debug('[metrics] frameStats.last keys:', Object.keys(last).sort()); } catch (_) {}
       loggedKeysOnce = true;
     }
-    let liveMphRaw = pick(last.mph, last.velocity, last.vel, last.release_speed);
-    let liveMph;
-    if (liveMphRaw !== undefined) {
-      // If value is > 100, it's likely in ft/s, convert to mph
-      if (liveMphRaw > 100) {
-        liveMph = liveMphRaw * 0.681818; // ft/s to mph conversion
-      } else {
-        liveMph = liveMphRaw; // Already in mph
-      }
-    } else {
-      liveMph = undefined;
-    }
+    const liveMph = pitchVelocityMph(last);
     const liveSpin = pick(last.spin, last.rpm, last.release_spin_rate);
     const base = metricsFromDatum(_lastDatum);
     const mph  = liveMph  !== undefined ? liveMph  : base.mph;

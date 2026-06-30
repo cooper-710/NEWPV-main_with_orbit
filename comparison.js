@@ -2,6 +2,7 @@ import { initScene, getRefs, setCameraView } from './src/scene.js';
 import { animateBalls } from './src/balls.js';
 import { loadPitchData } from './src/data.js';
 import { clearBalls, clearTrails, addBall, removeBallByType, setTrailVisible, replayAll, hasBallOfType, getBalls, initTrail } from './src/balls.js';
+import { pitchVelocityMph } from './src/velocity.js';
 
 let showTrail = false;
 
@@ -84,19 +85,7 @@ function metricsFromDatum(d) {
     mph: undefined, spin: undefined, ivb: undefined, hb: undefined
   };
 
-  // Convert velocity to mph - if value is > 100, assume it's in ft/s and convert
-  let mphRaw = pick(d.mph, d.velocity, d.vel, d.release_speed);
-  let mph;
-  if (mphRaw !== undefined) {
-    // If value is > 100, it's likely in ft/s, convert to mph
-    if (mphRaw > 100) {
-      mph = mphRaw * 0.681818; // ft/s to mph conversion
-    } else {
-      mph = mphRaw; // Already in mph
-    }
-  } else {
-    mph = undefined;
-  }
+  const mph = pitchVelocityMph(d);
   const spin = pick(d.spin, d.rpm, d.release_spin_rate);
   const ivb  = trackmanIVBInches(d);
 
@@ -491,4 +480,3 @@ function loop() {
   renderer.render(scene, camera);
 }
 loop();
-
