@@ -4,6 +4,7 @@ import { pitchColorMap } from './constants.js';
 import { getRefs } from './scene.js';
 import { Bus } from './data.js';
 import { pitchVelocityMph } from './velocity.js';
+import { cancelAllPitchTicks, cancelPitchTicks, schedulePitchTicks } from './metronome.js';
 
 let balls = [];
 let showTrail = false;
@@ -19,6 +20,7 @@ export function hasBallOfType(pitchType) {
 export function clearBalls() {
   const { scene } = getRefs();
   for (const b of balls) {
+    cancelPitchTicks(b.userData.metronomeSchedule);
     if (b.userData.trail) {
       scene.remove(b.userData.trail);
       b.userData.trail.geometry.dispose();
@@ -150,7 +152,7 @@ function updateTrailGeometry(ball, trailPoints) {
   }
 }
 
-export function addBall(pitch, pitchType, playerColor = null) {
+export function addBall(pitch, pitchType, playerColor = null, options = {}) {
   const { scene, clock } = getRefs();
 
   const ball = new THREE.Mesh(
@@ -160,6 +162,7 @@ export function addBall(pitch, pitchType, playerColor = null) {
   ball.castShadow = true;
 
   const mphDisplay = pitchVelocityMph(pitch) || 0;
+  const timeToPlate = Number(pitch.time_to_plate ?? pitch.timeToPlate ?? pitch.tt);
 
   const t0 = clock.getElapsedTime();
   ball.userData = {
@@ -174,22 +177,31 @@ export function addBall(pitch, pitchType, playerColor = null) {
     trail: null,
     trailPoints: [],
     finishedAt: null,  // Time when ball reached the plate
-    playerColor: playerColor || null  // Set player color if provided (for comparison mode)
+    playerColor: playerColor || null,  // Set player color if provided (for comparison mode)
+    timeToPlate: Number.isFinite(timeToPlate) ? timeToPlate : null,
+    metronomeSchedule: null
   };
 
   ball.position.set(ball.userData.release.x, ball.userData.release.y, ball.userData.release.z);
   balls.push(ball);
   scene.add(ball);
+  if (options.playMetronome !== false) {
+    cancelAllPitchTicks();
+    ball.userData.metronomeSchedule = schedulePitchTicks(ball.userData.timeToPlate);
+  }
   
   if (showTrail) {
     initTrail(ball);
   }
+
+  return ball;
 }
 
 export function removeBallByType(pitchType) {
   const { scene } = getRefs();
   balls = balls.filter(ball => {
     if (ball.userData.type === pitchType) {
+      cancelPitchTicks(ball.userData.metronomeSchedule);
       if (ball.userData.trail) {
         scene.remove(ball.userData.trail);
         ball.userData.trail.geometry.dispose();
@@ -207,17 +219,54 @@ export function removeBallByType(pitchType) {
   });
 }
 
-export function replayAll() {
+export function replayAll(options = {}) {
   const { clock } = getRefs();
   const now = clock.getElapsedTime();
+  const sequenceByPlayer = options.sequenceByPlayer === true;
+  const focusTypes = options.focusTypes || {};
+  const gapSeconds = Math.max(0, Number(options.gapSeconds) || 0);
   clearTrails();
+
+  cancelAllPitchTicks();
   for (const b of balls) {
+    b.userData.metronomeSchedule = null;
     b.userData.t0 = now;
     b.userData.finishedAt = null;
     b.position.set(b.userData.release.x, b.userData.release.y, b.userData.release.z);
     // Reinitialize trails if trail toggle is on
     if (showTrail && !b.userData.trail) {
       initTrail(b);
+    }
+  }
+
+  if (sequenceByPlayer) {
+    let startDelay = 0;
+
+    for (const playerId of ['player1', 'player2']) {
+      const playerBalls = balls.filter(ball => ball.userData.playerId === playerId);
+      if (playerBalls.length === 0) continue;
+
+      for (const ball of playerBalls) {
+        ball.userData.t0 = now + startDelay;
+      }
+
+      const focusBall = playerBalls.find(ball => ball.userData.type === focusTypes[playerId]);
+      if (focusBall) {
+        focusBall.userData.metronomeSchedule = schedulePitchTicks(
+          focusBall.userData.timeToPlate,
+          startDelay
+        );
+      }
+
+      const playerFlightTime = Math.max(
+        ...playerBalls.map(ball => Number(ball.userData.timeToPlate) || 0.5)
+      );
+      startDelay += playerFlightTime + gapSeconds;
+    }
+  } else {
+    const focusBall = balls.find(ball => ball.userData.type === options.focusType);
+    if (focusBall) {
+      focusBall.userData.metronomeSchedule = schedulePitchTicks(focusBall.userData.timeToPlate);
     }
   }
 }
@@ -258,6 +307,7 @@ export function animateBalls(delta) {
   balls = balls.filter(ball => {
     // If ball finished animation and 3 seconds have passed, remove it
     if (ball.userData.finishedAt !== null && (now - ball.userData.finishedAt) >= 3.0) {
+      cancelPitchTicks(ball.userData.metronomeSchedule);
       // Remove trail when ball reaches plate
       if (ball.userData.trail) {
         scene.remove(ball.userData.trail);
@@ -278,6 +328,13 @@ export function animateBalls(delta) {
   for (const ball of balls) {
     const { t0, release, velocity, accel, spinRate, spinAxis, finishedAt } = ball.userData;
     const t = now - t0;
+
+    // Comparison replays can stagger players. Keep later pitches at release
+    // until their scheduled start time.
+    if (t < 0) {
+      ball.position.set(release.x, release.y, release.z);
+      continue;
+    }
 
     // Check if ball has reached the plate
     const z = release.z + velocity.z * t + 0.5 * accel.z * t * t;

@@ -684,6 +684,10 @@
       flex-shrink: 0;
     }
 
+    .switch.metronome-switch {
+      grid-column: 1 / -1;
+    }
+
     .switch {
       display: flex;
       align-items: center;
@@ -1666,6 +1670,11 @@
     <div class="switch">
           <label for="trailToggle">Trail</label>
       <input type="checkbox" id="trailToggle" checked>
+        </div>
+
+        <div class="switch metronome-switch" title="Plays three ticks for the most recently selected pitch">
+          <label for="metronomeToggle">3-Tick Metronome</label>
+          <input type="checkbox" id="metronomeToggle">
         </div>
       </div>
 

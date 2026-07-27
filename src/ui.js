@@ -2,9 +2,11 @@ import { clearBalls, clearTrails, addBall, removeBallByType, setTrailVisible, re
 import { setCameraView, getRefs } from './scene.js';
 import { Bus } from './data.js';
 import { pitchVelocityMph } from './velocity.js';
+import { setMetronomeEnabled } from './metronome.js';
 
 let _state = { league: 'MLB', team: null, pitcher: null };
 let _lastDatum = null;
+let _audioSelectionOrder = [];
 
 function fmt(v, d = 1) {
   if (v === null || v === undefined || Number.isNaN(Number(v))) return '--';
@@ -226,10 +228,13 @@ export function buildPitchCheckboxes(pitcherData) {
       cb.addEventListener('change', () => {
         if (cb.checked) {
           const datum = pitchGroups[type][zone];
+          _audioSelectionOrder = _audioSelectionOrder.filter(id => id !== combo);
+          _audioSelectionOrder.push(combo);
           addBall(datum, combo);
           _lastDatum = datum;
           renderMetrics(metricsFromDatum(_lastDatum));
         } else {
+          _audioSelectionOrder = _audioSelectionOrder.filter(id => id !== combo);
           removeBallByType(combo);
           if (_lastDatum === pitchGroups[type][zone]) {
             _lastDatum = null;
@@ -260,6 +265,7 @@ export function buildPitchCheckboxes(pitcherData) {
       }
     });
     _lastDatum = null;
+    _audioSelectionOrder = [];
     renderMetrics(metricsFromDatum(null));
   });
   container.appendChild(clr);
@@ -291,6 +297,7 @@ export function initControls(data, setPlaying) {
   const replayBtn = document.getElementById('replayBtn');
   const orbitToggle = document.getElementById('orbitToggle');
   const trailToggle = document.getElementById('trailToggle');
+  const metronomeToggle = document.getElementById('metronomeToggle');
   const metricsPanel = document.getElementById('metricsPanel');
   const playerSearch = document.getElementById('playerSearch');
   const searchResults = document.getElementById('searchResults');
@@ -302,6 +309,7 @@ export function initControls(data, setPlaying) {
   function clearPitchSelection() {
     clearBalls();
     _lastDatum = null;
+    _audioSelectionOrder = [];
     renderMetrics(metricsFromDatum(null));
     const container = document.getElementById('pitchCheckboxes');
     if (container) container.innerHTML = '';
@@ -551,15 +559,19 @@ export function initControls(data, setPlaying) {
         const pitchType = cb.id;
         // Only re-add if ball doesn't exist (was removed after reaching plate)
         if (!hasBallOfType(pitchType) && pitcherData[pitchType]) {
-          addBall(pitcherData[pitchType], pitchType);
+          addBall(pitcherData[pitchType], pitchType, null, { playMetronome: false });
         }
       });
     }
     
-    replayAll();
+    replayAll({ focusType: _audioSelectionOrder[_audioSelectionOrder.length - 1] });
   });
 
   trailToggle.addEventListener('change', e => { setTrailVisible(e.target.checked); _writeUrl(); });
+  metronomeToggle.addEventListener('change', e => {
+    setMetronomeEnabled(e.target.checked);
+    _writeUrl();
+  });
 
   // NEW: Orbit toggle bind
   orbitToggle.addEventListener('change', e => {
@@ -606,6 +618,7 @@ export function initControls(data, setPlaying) {
   const wantPitcher = params.get('pitcher');
   const wantView = params.get('view');
   const wantTrail = params.get('trail');
+  const wantMetronome = params.get('metronome');
   const wantOrbit = params.get('orbit');
   const leagues = Object.keys(data);
   const resolvedLeague = wantLeague && leagues.includes(wantLeague)
@@ -630,6 +643,10 @@ export function initControls(data, setPlaying) {
   } else {
     setTrailVisible(!!trailToggle.checked);
   }
+  if (wantMetronome !== null) {
+    metronomeToggle.checked = (wantMetronome === '1' || wantMetronome === 'true');
+  }
+  setMetronomeEnabled(metronomeToggle.checked);
   if (wantOrbit !== null) {
     const on = (wantOrbit === '1' || wantOrbit === 'true');
     orbitToggle.checked = on;
@@ -649,6 +666,7 @@ export function initControls(data, setPlaying) {
       pitcher: _state.pitcher || '',
       view: cameraValue,
       trail: trailToggle.checked ? '1' : '0',
+      metronome: metronomeToggle.checked ? '1' : '0',
       orbit: orbitToggle.checked ? '1' : '0'
     });
     const newUrl = `${location.pathname}?${q.toString()}`;

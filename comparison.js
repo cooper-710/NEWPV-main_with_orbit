@@ -3,6 +3,7 @@ import { animateBalls } from './src/balls.js';
 import { loadPitchData } from './src/data.js';
 import { clearBalls, clearTrails, addBall, removeBallByType, setTrailVisible, replayAll, hasBallOfType, getBalls, initTrail } from './src/balls.js';
 import { pitchVelocityMph } from './src/velocity.js';
+import { setMetronomeEnabled } from './src/metronome.js';
 
 let showTrail = false;
 
@@ -16,6 +17,10 @@ let player2Team = null;
 let player2Pitcher = null;
 let player1LastDatum = null;
 let player2LastDatum = null;
+const audioSelectionOrder = {
+  player1: [],
+  player2: []
+};
 
 function normalizeSearchText(value) {
   return String(value || '')
@@ -117,6 +122,8 @@ const orbitToggle1 = document.getElementById('player1OrbitToggle');
 const trailToggle1 = document.getElementById('player1TrailToggle');
 const orbitToggle2 = document.getElementById('player2OrbitToggle');
 const trailToggle2 = document.getElementById('player2TrailToggle');
+const metronomeToggle1 = document.getElementById('player1MetronomeToggle');
+const metronomeToggle2 = document.getElementById('player2MetronomeToggle');
 
 // Orbit toggle - both toggles control the same thing
 function updateOrbit(enabled) {
@@ -139,6 +146,16 @@ function updateTrail(enabled) {
 
 trailToggle1.addEventListener('change', (e) => updateTrail(e.target.checked));
 trailToggle2.addEventListener('change', (e) => updateTrail(e.target.checked));
+
+// Metronome is shared so simultaneous comparison pitches stay synchronized.
+function updateMetronome(enabled) {
+  setMetronomeEnabled(enabled);
+  metronomeToggle1.checked = enabled;
+  metronomeToggle2.checked = enabled;
+}
+
+metronomeToggle1.addEventListener('change', (e) => updateMetronome(e.target.checked));
+metronomeToggle2.addEventListener('change', (e) => updateMetronome(e.target.checked));
 
 // Custom dropdown for camera selection
 const cameraDropdown = document.getElementById('cameraDropdown');
@@ -319,7 +336,12 @@ document.addEventListener('click', (e) => {
 
 function buildPitchCheckboxes(playerId, pitcherData, color) {
   const container = document.getElementById(`${playerId}Checkboxes`);
+  container.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+    cb.checked = false;
+    cb.dispatchEvent(new Event('change'));
+  });
   container.innerHTML = '';
+  audioSelectionOrder[playerId] = [];
 
   if (!pitcherData) return;
 
@@ -353,6 +375,8 @@ function buildPitchCheckboxes(playerId, pitcherData, color) {
       cb.addEventListener('change', () => {
         if (cb.checked) {
           const datum = pitchGroups[type][zone];
+          audioSelectionOrder[playerId] = audioSelectionOrder[playerId].filter(id => id !== fullId);
+          audioSelectionOrder[playerId].push(fullId);
           // Add ball with player identifier
           const ball = addBall(datum, fullId, color);
           if (ball && ball.userData) {
@@ -371,6 +395,7 @@ function buildPitchCheckboxes(playerId, pitcherData, color) {
             renderPlayerMetrics('player2', metricsFromDatum(datum));
           }
         } else {
+          audioSelectionOrder[playerId] = audioSelectionOrder[playerId].filter(id => id !== fullId);
           // Remove ball by full ID
           removeBallByType(fullId);
           // Clear metrics if this was the last selected pitch
@@ -412,9 +437,11 @@ function buildPitchCheckboxes(playerId, pitcherData, color) {
     });
     // Clear metrics for this player
     if (playerId === 'player1') {
+      audioSelectionOrder.player1 = [];
       player1LastDatum = null;
       renderPlayerMetrics('player1', metricsFromDatum(null));
     } else {
+      audioSelectionOrder.player2 = [];
       player2LastDatum = null;
       renderPlayerMetrics('player2', metricsFromDatum(null));
     }
@@ -438,7 +465,7 @@ replayBtn.addEventListener('click', () => {
     const color = playerId === 'player1' ? '#ff6600' : '#00aaff';
     
     if (!hasBallOfType(fullId) && playerData && playerData[combo]) {
-      const ball = addBall(playerData[combo], fullId, color);
+      const ball = addBall(playerData[combo], fullId, color, { playMetronome: false });
       if (ball && ball.userData) {
         ball.userData.playerId = playerId;
         // Update ball color based on player
@@ -449,7 +476,14 @@ replayBtn.addEventListener('click', () => {
     }
   });
   
-  replayAll();
+  replayAll({
+    sequenceByPlayer: true,
+    focusTypes: {
+      player1: audioSelectionOrder.player1[audioSelectionOrder.player1.length - 1],
+      player2: audioSelectionOrder.player2[audioSelectionOrder.player2.length - 1]
+    },
+    gapSeconds: 0.35
+  });
 });
 
 // Clear all button
@@ -462,6 +496,8 @@ clearBtn.addEventListener('click', () => {
   });
   player1LastDatum = null;
   player2LastDatum = null;
+  audioSelectionOrder.player1 = [];
+  audioSelectionOrder.player2 = [];
   renderPlayerMetrics('player1', metricsFromDatum(null));
   renderPlayerMetrics('player2', metricsFromDatum(null));
 });

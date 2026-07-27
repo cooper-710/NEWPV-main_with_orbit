@@ -599,6 +599,10 @@
       flex-shrink: 0;
     }
 
+    .switch.metronome-switch {
+      grid-column: 1 / -1;
+    }
+
     .switch {
       display: flex;
       align-items: center;
@@ -1314,7 +1318,7 @@
           </div>
         </div>
       </div>
-      <button id="replayBtn" class="primary">Replay</button>
+      <button id="replayBtn" class="primary">Replay A → B</button>
       <button id="clearBtn">Clear</button>
       <button class="back-button" onclick="window.location.href='index.html'">Back</button>
     </div>
@@ -1341,7 +1345,7 @@
         </div>
       </div>
       <div class="panel-controls-row">
-        <button id="replayBtn" class="primary">Replay</button>
+        <button id="replayBtn" class="primary">Replay A → B</button>
         <button id="clearBtn">Clear</button>
       </div>
     </div>
@@ -1365,6 +1369,10 @@
         <div class="switch">
           <label for="player1TrailToggle">Trail</label>
           <input type="checkbox" id="player1TrailToggle">
+        </div>
+        <div class="switch metronome-switch" title="Replay runs Player 1, pauses, then runs Player 2">
+          <label for="player1MetronomeToggle">3-Tick Metronome</label>
+          <input type="checkbox" id="player1MetronomeToggle">
         </div>
       </div>
     <div id="player1Checkboxes" class="pitch-checkboxes"></div>
@@ -1416,6 +1424,10 @@
         <div class="switch">
           <label for="player2TrailToggle">Trail</label>
           <input type="checkbox" id="player2TrailToggle">
+        </div>
+        <div class="switch metronome-switch" title="Replay runs Player 1, pauses, then runs Player 2">
+          <label for="player2MetronomeToggle">3-Tick Metronome</label>
+          <input type="checkbox" id="player2MetronomeToggle">
         </div>
       </div>
     <div id="player2Checkboxes" class="pitch-checkboxes"></div>
@@ -1639,4 +1651,3 @@
   </script>
 </body>
 </html>
-
