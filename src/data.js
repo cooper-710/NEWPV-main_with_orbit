@@ -1,7 +1,7 @@
 export async function loadPitchData(options = {}) {
   const [mlbRes, aaaRes] = await Promise.all([
     fetch('./pitch_data.json'),
-    fetch('./aaa_pitch_data_2025-06-10_to_2025-06-28.json')
+    fetch('./aaa_pitch_data_2025-09-01_to_2025-09-26.json')
   ]);
   const [mlbData, aaaData] = await Promise.all([mlbRes.json(), aaaRes.json()]);
   if (!options.groupByLeague) return mlbData || {};
